@@ -1,0 +1,102 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marketplace Seller Simulator - Day 6</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { font-family: Arial, sans-serif; margin: 20px; background: #121318; color: #e7e7ea; }
+      h1 { margin: 0 0 12px; }
+      .row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+      button { background: #7a4cff; border: 0; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+      button.btn-secondary { background: #3a3f52; }
+      button:hover { opacity: 0.95; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      .card { background: #1b1d25; border: 1px solid #2b2e3a; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+      pre { white-space: pre-wrap; word-break: break-word; }
+      .muted { color: #a9acb7; font-size: 13px; }
+      select, input[type="number"] { background: #252836; border: 1px solid #2b2e3a; color: #e7e7ea; padding: 6px 8px; border-radius: 6px; min-width: 120px; }
+      label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #a9acb7; }
+      ul.incoming { margin: 8px 0 0; padding-left: 20px; }
+      ul.incoming li { margin-bottom: 4px; }
+      table.stock { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+      table.stock th, table.stock td { border: 1px solid #2b2e3a; padding: 6px 8px; text-align: left; }
+      table.stock th { color: #a9acb7; font-weight: 600; }
+      table.stock td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body>
+    <h1>Marketplace Seller Simulator</h1>
+    <div class="row">
+      <button id="nextDayBtn" type="button">Next Day</button>
+      <button id="resetBtn" type="button" class="btn-secondary">Сброс</button>
+      <button id="saveBtn" type="button" class="btn-secondary">Сохранить</button>
+      <button id="loadBtn" type="button" class="btn-secondary">Загрузить</button>
+      <span class="muted">День 6 — возвраты (₽), разбивка P&amp;L, localStorage</span>
+    </div>
+
+    <div class="card">
+      <strong>Реклама (день)</strong>
+      <div class="row" style="align-items: center; margin-top: 8px;">
+        <label class="field" style="flex: 1; min-width: 200px;">Бюджет
+          <input type="range" id="adBudgetRange" min="0" max="15000" step="100" value="0" />
+        </label>
+        <span id="adBudgetLabel" class="muted">0</span>
+      </div>
+      <p class="muted" style="margin: 8px 0 0;">Рекламный трафик делится между SKU пропорционально <code>baseDemand</code>.</p>
+    </div>
+
+    <div class="card">
+      <strong>Цены и карточка (по SKU)</strong>
+      <div id="merchRoot"></div>
+    </div>
+
+    <div class="card">
+      <strong>Закупка</strong>
+      <div class="row" style="align-items: flex-end; margin-top: 8px;">
+        <label class="field">SKU
+          <select id="skuSelect"></select>
+        </label>
+        <label class="field">Количество
+          <input type="number" id="qtyInput" min="1" value="20" step="1" />
+        </label>
+        <button type="button" id="buyBtn">Купить</button>
+      </div>
+      <p class="muted" id="buyHint" style="margin: 8px 0 0;"></p>
+    </div>
+
+    <div class="card">
+      <strong>В пути</strong>
+      <div id="incomingList" class="muted">Нет активных поставок</div>
+    </div>
+
+    <div class="card">
+      <strong>Summary</strong>
+      <div id="summary"></div>
+      <p class="muted" style="margin: 8px 0 0;">Остатки по SKU — в объекте <code>inStock</code> (ключ = <code>id</code> товара), не внутри массива <code>skus</code>.</p>
+    </div>
+
+    <div class="card">
+      <strong>Склад (остатки по SKU)</strong>
+      <div id="stockTable"></div>
+    </div>
+
+    <div class="card">
+      <strong>Итог вчерашнего дня</strong>
+      <div id="yesterdayReport" class="muted">Ещё не было симуляции (нажми Next Day).</div>
+    </div>
+
+    <div class="card">
+      <strong>Разбивка затрат (последний симулированный день)</strong>
+      <div id="costBreakdown" class="muted">Нет данных — сначала нажми Next Day.</div>
+    </div>
+
+    <div class="card">
+      <strong>State Debug</strong>
+      <pre id="stateDump"></pre>
+    </div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

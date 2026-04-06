@@ -1,0 +1,11 @@
+﻿[
+  {
+    "id": "beauty",
+    "name": "Beauty and Care",
+    "baseDemandMod": 1.15,
+    "baseMarginMod": 0.32,
+    "baseReturnRate": 0.07,
+    "volatility": 0.12,
+    "logisticsComplexity": 0.2
+  }
+]

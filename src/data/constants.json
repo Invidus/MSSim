@@ -1,0 +1,11 @@
+{
+  "adEfficiency": 0.028,
+  "saturationCap": 8000,
+  "baseConversion": 0.012,
+  "feeRate": 0.18,
+  "paymentRate": 0.01,
+  "fixedOverheadDaily": 900,
+  "outboundCostPerUnit": 28,
+  "distanceMod": 1,
+  "returnHandlingCostPerUnit": 45
+}

@@ -1,0 +1,102 @@
+﻿[
+  {
+    "id": "beauty_lip_01",
+    "name": "Lip Set",
+    "tier": "low",
+    "purchaseCost": 380,
+    "recommendedPrice": 990,
+    "baseDemand": 210,
+    "baseReturnRate": 0.05,
+    "leadTimeDays": 4
+  },
+  {
+    "id": "beauty_mask_02",
+    "name": "Face Mask",
+    "tier": "low",
+    "purchaseCost": 260,
+    "recommendedPrice": 690,
+    "baseDemand": 240,
+    "baseReturnRate": 0.04,
+    "leadTimeDays": 3
+  },
+  {
+    "id": "beauty_serum_07",
+    "name": "Serum",
+    "tier": "mid",
+    "purchaseCost": 720,
+    "recommendedPrice": 1690,
+    "baseDemand": 150,
+    "baseReturnRate": 0.07,
+    "leadTimeDays": 5
+  },
+  {
+    "id": "beauty_brush_03",
+    "name": "Brush Pack",
+    "tier": "low",
+    "purchaseCost": 300,
+    "recommendedPrice": 840,
+    "baseDemand": 180,
+    "baseReturnRate": 0.05,
+    "leadTimeDays": 4
+  },
+  {
+    "id": "beauty_cream_04",
+    "name": "Cream",
+    "tier": "mid",
+    "purchaseCost": 460,
+    "recommendedPrice": 1190,
+    "baseDemand": 170,
+    "baseReturnRate": 0.06,
+    "leadTimeDays": 4
+  },
+  {
+    "id": "beauty_shampoo_05",
+    "name": "Shampoo",
+    "tier": "low",
+    "purchaseCost": 340,
+    "recommendedPrice": 910,
+    "baseDemand": 220,
+    "baseReturnRate": 0.05,
+    "leadTimeDays": 3
+  },
+  {
+    "id": "beauty_perfume_06",
+    "name": "Perfume",
+    "tier": "high",
+    "purchaseCost": 980,
+    "recommendedPrice": 2490,
+    "baseDemand": 120,
+    "baseReturnRate": 0.08,
+    "leadTimeDays": 6
+  },
+  {
+    "id": "beauty_kit_08",
+    "name": "Care Kit",
+    "tier": "mid",
+    "purchaseCost": 640,
+    "recommendedPrice": 1590,
+    "baseDemand": 145,
+    "baseReturnRate": 0.06,
+    "leadTimeDays": 5
+  },
+  {
+    "id": "beauty_wipes_09",
+    "name": "Wipes",
+    "tier": "low",
+    "purchaseCost": 120,
+    "recommendedPrice": 390,
+    "baseDemand": 260,
+    "baseReturnRate": 0.04,
+    "leadTimeDays": 2
+  },
+  {
+    "id": "beauty_tonic_10",
+    "name": "Tonic",
+    "tier": "low",
+    "purchaseCost": 280,
+    "recommendedPrice": 790,
+    "baseDemand": 205,
+    "baseReturnRate": 0.05,
+    "leadTimeDays": 3
+  }
+]

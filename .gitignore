@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local / secrets
+.env
+.env.*
