@@ -13,3 +13,6 @@ Thumbs.db
 # Local / secrets
 .env
 .env.*
+
+# Markdown (design docs — не в репозитории)
+*.md
