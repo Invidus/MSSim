@@ -7,5 +7,50 @@
     "baseReturnRate": 0.07,
     "volatility": 0.12,
     "logisticsComplexity": 0.2
+  },
+  {
+    "id": "home",
+    "name": "Home and Kitchen",
+    "baseDemandMod": 1.0,
+    "baseMarginMod": 0.28,
+    "baseReturnRate": 0.06,
+    "volatility": 0.1,
+    "logisticsComplexity": 0.35
+  },
+  {
+    "id": "kids",
+    "name": "Kids and Toys",
+    "baseDemandMod": 0.95,
+    "baseMarginMod": 0.3,
+    "baseReturnRate": 0.09,
+    "volatility": 0.18,
+    "logisticsComplexity": 0.3
+  },
+  {
+    "id": "apparel",
+    "name": "Apparel and Basics",
+    "baseDemandMod": 1.2,
+    "baseMarginMod": 0.35,
+    "baseReturnRate": 0.16,
+    "volatility": 0.22,
+    "logisticsComplexity": 0.25
+  },
+  {
+    "id": "pet",
+    "name": "Pet Supplies",
+    "baseDemandMod": 0.9,
+    "baseMarginMod": 0.26,
+    "baseReturnRate": 0.05,
+    "volatility": 0.08,
+    "logisticsComplexity": 0.28
+  },
+  {
+    "id": "electronics",
+    "name": "Gadgets and Accessories",
+    "baseDemandMod": 1.05,
+    "baseMarginMod": 0.33,
+    "baseReturnRate": 0.1,
+    "volatility": 0.2,
+    "logisticsComplexity": 0.4
   }
 ]

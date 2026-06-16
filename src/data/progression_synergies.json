@@ -1,0 +1,23 @@
+[
+  {
+    "id": "syn_growth_flywheel",
+    "title": "Синергия роста",
+    "requires": ["n7", "n9"],
+    "desc": "Трафик + конверсия: +5% adEfficiency и +3% conversion",
+    "effect": { "adEfficiencyMult": 1.05, "baseConversionMult": 1.03 }
+  },
+  {
+    "id": "syn_ops_quality",
+    "title": "Синергия качества операций",
+    "requires": ["n8", "n6"],
+    "desc": "Операции + качество: -0.2 п.п. feeRate и -4% returns cost",
+    "effect": { "feeRateDelta": -0.002, "returnHandlingCostMult": 0.96 }
+  },
+  {
+    "id": "syn_full_stack",
+    "title": "Сквозная синергия",
+    "requires": ["n10", "n11", "n12"],
+    "desc": "Полный контур: +4% conversion и -3% outbound",
+    "effect": { "baseConversionMult": 1.04, "outboundCostMult": 0.97 }
+  }
+]

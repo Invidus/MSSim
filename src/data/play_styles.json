@@ -1,0 +1,44 @@
+[
+  {
+    "id": "marketer",
+    "name": "Маркетолог",
+    "desc": "Высокий рекламный бюджет, рост трафика и конверсии. Риск stockout выше.",
+    "preset": {
+      "feeRate": 0.185,
+      "paymentRate": 0.011,
+      "outboundCostPerUnit": 30,
+      "fixedOverheadDaily": 950,
+      "adBudget": 5000,
+      "returnRateMod": 1.03,
+      "adEnabled": true
+    }
+  },
+  {
+    "id": "operator",
+    "name": "Оператор",
+    "desc": "Консервативные расходы, запас и сервис. Ниже реклама, ниже возвраты.",
+    "preset": {
+      "feeRate": 0.175,
+      "paymentRate": 0.01,
+      "outboundCostPerUnit": 24,
+      "fixedOverheadDaily": 800,
+      "adBudget": 1200,
+      "returnRateMod": 0.9,
+      "adEnabled": true
+    }
+  },
+  {
+    "id": "assortment",
+    "name": "Ассортимент",
+    "desc": "Баланс маржи и портфеля: умеренная реклама, фокус на ширину SKU.",
+    "preset": {
+      "feeRate": 0.178,
+      "paymentRate": 0.01,
+      "outboundCostPerUnit": 26,
+      "fixedOverheadDaily": 880,
+      "adBudget": 2400,
+      "returnRateMod": 0.97,
+      "adEnabled": true
+    }
+  }
+]

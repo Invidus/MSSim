@@ -1,0 +1,92 @@
+[
+  {
+    "id": "evt_supplier_delay",
+    "name": "Задержка поставщика",
+    "type": "negative",
+    "durationDays": 5,
+    "weight": 1,
+    "scope": "category",
+    "effect": { "leadTimeExtraByCategory": 2, "purchaseLeadTimeExtraByCategory": 2 }
+  },
+  {
+    "id": "evt_pack_defect",
+    "name": "Всплеск брака упаковки",
+    "type": "negative",
+    "durationDays": 4,
+    "weight": 1,
+    "scope": "global",
+    "effect": { "returnRateModMult": 1.04 }
+  },
+  {
+    "id": "evt_ad_overheat",
+    "name": "Перегрев рекламного аукциона",
+    "type": "negative",
+    "durationDays": 3,
+    "weight": 1,
+    "scope": "global",
+    "effect": { "adEfficiencyMult": 0.82 }
+  },
+  {
+    "id": "evt_negative_review",
+    "name": "Вирусный негативный отзыв",
+    "type": "negative",
+    "durationDays": 3,
+    "weight": 1,
+    "scope": "global",
+    "effect": { "serviceRatingDelta": -0.2 }
+  },
+  {
+    "id": "evt_competitor_dump",
+    "name": "Демпинг конкурента",
+    "type": "negative",
+    "durationDays": 4,
+    "weight": 1,
+    "scope": "category",
+    "effect": { "marketPriceMultByCategory": 0.93 }
+  },
+  {
+    "id": "evt_niche_saturation",
+    "name": "Насыщение ниши",
+    "type": "negative",
+    "durationDays": 5,
+    "weight": 1,
+    "scope": "category",
+    "effect": { "categoryOrganicMult": 0.9 }
+  },
+  {
+    "id": "evt_blogger_mention",
+    "name": "Упоминание у блогера",
+    "type": "positive",
+    "durationDays": 4,
+    "weight": 1,
+    "scope": "sku",
+    "effect": { "skuOrganicMult": 1.16 }
+  },
+  {
+    "id": "evt_supplier_discount",
+    "name": "Скидка лояльности от поставщика",
+    "type": "positive",
+    "durationDays": 10,
+    "weight": 1,
+    "scope": "category",
+    "effect": { "purchaseCostMultByCategory": 0.94 }
+  },
+  {
+    "id": "evt_featured_category",
+    "name": "Фичеринг на площадке",
+    "type": "positive",
+    "durationDays": 5,
+    "weight": 1,
+    "scope": "category",
+    "effect": { "categoryOrganicMult": 1.22 }
+  },
+  {
+    "id": "evt_route_optimization",
+    "name": "Оптимизация маршрутов",
+    "type": "positive",
+    "durationDays": 6,
+    "weight": 1,
+    "scope": "global",
+    "effect": { "outboundCostMult": 0.88 }
+  }
+]

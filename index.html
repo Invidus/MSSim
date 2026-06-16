@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Marketplace Seller Simulator - Day 6</title>
+    <title>Marketplace Seller Simulator - Phase 2</title>
     <style>
       :root { color-scheme: dark; }
       body { font-family: Arial, sans-serif; margin: 20px; background: #121318; color: #e7e7ea; }
@@ -24,6 +24,14 @@
       table.stock th, table.stock td { border: 1px solid #2b2e3a; padding: 6px 8px; text-align: left; }
       table.stock th { color: #a9acb7; font-weight: 600; }
       table.stock td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 8px; }
+      .kpi-card { border: 1px solid #2b2e3a; border-radius: 8px; background: #181b23; padding: 10px; }
+      .kpi-title { color: #a9acb7; font-size: 12px; margin-bottom: 6px; display:flex; align-items:center; gap:6px; }
+      .kpi-help { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:999px; border:1px solid #3a3f52; color:#c9d2ff; font-size:11px; cursor:help; }
+      .kpi-value { font-size: 18px; font-weight: 700; }
+      .kpi-good { color: #8fd694; }
+      .kpi-warn { color: #ffcc66; }
+      .kpi-bad { color: #ff8f8f; }
     </style>
   </head>
   <body>
@@ -33,22 +41,85 @@
       <button id="resetBtn" type="button" class="btn-secondary">Сброс</button>
       <button id="saveBtn" type="button" class="btn-secondary">Сохранить</button>
       <button id="loadBtn" type="button" class="btn-secondary">Загрузить</button>
-      <span class="muted">День 6 — возвраты (₽), разбивка P&amp;L, localStorage</span>
+      <button id="exportJsonBtn" type="button" class="btn-secondary">Экспорт JSON</button>
+      <button id="exportPlaytestBtn" type="button" class="btn-secondary">Экспорт отчёта плейтеста</button>
+      <button id="exportServiceDiagBtn" type="button" class="btn-secondary">Экспорт диагностики сервиса</button>
+      <button id="exportPhase2Btn" type="button" class="btn-secondary">Экспорт phase2 build отчёта</button>
+      <button id="importJsonBtn" type="button" class="btn-secondary">Импорт JSON</button>
+      <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none" />
+      <span class="muted">Фаза 4 — онбординг, QoL</span>
+    </div>
+
+    <div class="card">
+      <strong>Онбординг первого рана (дни 66–68)</strong>
+      <div id="onboardingPanel" class="muted">Подсказки появятся после инициализации.</div>
+      <div class="row" style="margin-top:8px;">
+        <button id="hideOnboardingBtn" type="button" class="btn-secondary">Скрыть онбординг</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>Платформа (день 18)</strong>
+      <div id="sdkStatus" class="muted">Проверка SDK…</div>
+      <div class="row" style="margin-top: 8px;">
+        <button id="rewardedBtn" type="button" class="btn-secondary">Получить rewarded +5 000</button>
+        <span id="rewardedHint" class="muted">Доступно после симуляции дня; 1 раз на день.</span>
+      </div>
+      <div id="interstitialHint" class="muted" style="margin-top: 6px;">Interstitial: ожидание первой симуляции.</div>
+      <p class="muted" style="margin: 8px 0 0;">Если Яндекс SDK недоступен, игра продолжает работать в обычном веб-режиме.</p>
     </div>
 
     <div class="card">
       <strong>Реклама (день)</strong>
       <div class="row" style="align-items: center; margin-top: 8px;">
+        <label class="field" style="min-width: 160px;">Статус
+          <label style="display:flex;align-items:center;gap:8px;color:#e7e7ea">
+            <input type="checkbox" id="adEnabledToggle" checked />
+            <span>Реклама включена</span>
+          </label>
+        </label>
         <label class="field" style="flex: 1; min-width: 200px;">Бюджет
           <input type="range" id="adBudgetRange" min="0" max="15000" step="100" value="0" />
         </label>
         <span id="adBudgetLabel" class="muted">0</span>
       </div>
-      <p class="muted" style="margin: 8px 0 0;">Рекламный трафик делится между SKU пропорционально <code>baseDemand</code>.</p>
+      <p class="muted" style="margin: 8px 0 0;">Рекламный трафик делится между SKU пропорционально <code>baseDemand</code>. При выключении рекламы списание в P&amp;L = 0.</p>
     </div>
 
     <div class="card">
-      <strong>Цены и карточка (по SKU)</strong>
+      <strong>Модель затрат (день 10)</strong>
+      <div class="row" style="align-items: flex-end; margin-top: 8px;">
+        <label class="field">Комиссия MP (доля)
+          <input id="feeRateInput" type="number" min="0" max="1" step="0.001" value="0.18" />
+        </label>
+        <label class="field">Эквайринг (доля)
+          <input id="paymentRateInput" type="number" min="0" max="1" step="0.001" value="0.01" />
+        </label>
+        <label class="field">Логистика/ед.
+          <input id="outboundCostInput" type="number" min="0" step="1" value="28" />
+        </label>
+        <label class="field">Оверхед/день
+          <input id="overheadInput" type="number" min="0" step="10" value="900" />
+        </label>
+        <button id="resetCostsBtn" type="button" class="btn-secondary">Сбросить затраты</button>
+      </div>
+      <p class="muted" style="margin: 8px 0 0;">COGS берется из <code>purchaseCost</code> каждого SKU (фикс в данных). Эти поля меняют только дневные ставки затрат.</p>
+    </div>
+
+    <div class="card">
+      <strong>Возвраты (день 11)</strong>
+      <div class="row" style="align-items: center; margin-top: 8px;">
+        <label class="field" style="flex: 1; min-width: 220px;">Модификатор доли возвратов
+          <input id="returnRateModRange" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+        </label>
+        <span id="returnRateModLabel" class="muted">x1.00</span>
+      </div>
+      <p class="muted" style="margin: 8px 0 0;">Возвраты считаются как <code>baseReturnRate × модификатор</code> (с ограничением до 95%). Чистая выручка = валовая выручка − сумма возвращённых заказов.</p>
+    </div>
+
+    <div class="card">
+      <strong>Карточка товара (по SKU)</strong>
+      <p class="muted" style="margin: 0 0 8px">Пресеты качества и цена влияют на конверсию; промо — небольшой буст. «Реком.» подставляет цену маркетплейса для строки.</p>
       <div id="merchRoot"></div>
     </div>
 
@@ -72,9 +143,136 @@
     </div>
 
     <div class="card">
+      <strong>Поступление на склад (начало дня)</strong>
+      <div id="morningArrivals" class="muted">Партий ещё не было — после Next Day здесь появятся приходы до продаж этого дня.</div>
+      <p class="muted" style="margin: 8px 0 0;">Порядок: новый календарный день → приход всех партий с датой прибытия ≤ этому дню → затем симуляция продаж.</p>
+    </div>
+
+    <div class="card">
       <strong>Summary</strong>
       <div id="summary"></div>
+      <div id="serviceRating" class="muted" style="margin-top:8px;">Рейтинг сервиса появится после первой симуляции.</div>
+      <div id="serviceDiagnostics" class="muted" style="margin-top:6px;">Диагностика причины просадки появится после первой симуляции.</div>
+      <div class="row" style="margin-top:8px;">
+        <button id="importServiceDiagBaseBtn" type="button" class="btn-secondary">Импорт baseline (до)</button>
+        <button id="importServiceDiagCandBtn" type="button" class="btn-secondary">Импорт candidate (после)</button>
+        <button id="clearServiceDiagCompareBtn" type="button" class="btn-secondary">Очистить сравнение</button>
+        <input id="importServiceDiagBaseInput" type="file" accept="application/json,.json" style="display:none" />
+        <input id="importServiceDiagCandInput" type="file" accept="application/json,.json" style="display:none" />
+      </div>
+      <div id="serviceDiagCompare" class="muted" style="margin-top:6px;">Сравнение baseline/candidate появится после импорта двух отчётов.</div>
+      <div class="row" style="margin-top:8px;">
+        <label class="field">Категория для просмотра
+          <select id="categoryFilterSelect"></select>
+        </label>
+      </div>
       <p class="muted" style="margin: 8px 0 0;">Остатки по SKU — в объекте <code>inStock</code> (ключ = <code>id</code> товара), не внутри массива <code>skus</code>.</p>
+    </div>
+
+    <div class="card">
+      <strong>Команда (фаза 3)</strong>
+      <div id="teamPanel" class="muted">Панель команды появится после инициализации.</div>
+      <p class="muted" style="margin: 8px 0 0;">ЗП списывается ежедневно в P&amp;L после найма узлов ветки «Команда».</p>
+    </div>
+
+    <div class="card">
+      <strong>Стили игры (дни 59–64)</strong>
+      <div id="playStylesMeta" class="muted">Три стиля: маркетинг, операционка, ассортимент.</div>
+      <div id="playStylesPanel" class="muted" style="margin-top:8px;">Кнопки стилей появятся после инициализации.</div>
+    </div>
+
+    <div class="card">
+      <strong>Антиэксплойт (дни 59–64)</strong>
+      <div id="antiExploitPanel" class="muted">Мягкие проверки ad-only, zero-risk и перестекинга MKT+AUTO.</div>
+    </div>
+
+    <div class="card">
+      <strong>Phase 3 — регрессии и freeze (дни 65–69)</strong>
+      <div class="row" style="margin-top:8px;">
+        <button id="runRegression14Btn" type="button" class="btn-secondary">Регрессия 14 дней</button>
+        <button id="runRegression28Btn" type="button" class="btn-secondary">Регрессия 28 дней</button>
+        <button id="runStyleBalanceBtn" type="button" class="btn-secondary">Аудит баланса 3 стилей</button>
+        <button id="exportPhase3FreezeBtn" type="button" class="btn-secondary">Экспорт Phase 3 freeze</button>
+      </div>
+      <div id="phase3RegressionStatus" class="muted" style="margin-top:6px;">Длинные регрессии: не запускались.</div>
+      <div id="phase3FreezeSummary" class="muted" style="margin-top:8px;">Сводка Phase 3 freeze появится после прогонов.</div>
+    </div>
+
+    <div class="card">
+      <strong>Прогрессия (34 узла)</strong>
+      <div id="progressionMeta" class="muted">Узлы прогрессии появятся после инициализации.</div>
+      <div id="progressionPanel" class="muted" style="margin-top:8px;">Нет данных прогрессии.</div>
+    </div>
+
+    <div class="card">
+      <strong>Кампания 60 дней (дни 38–41)</strong>
+      <div id="campaignReadability" class="muted">Прогноз кампании появится после первой симуляции.</div>
+    </div>
+
+    <div class="card">
+      <strong>События (v3 — 24)</strong>
+      <div id="eventsPanel" class="muted">Панель событий появится после инициализации.</div>
+      <p class="muted" style="margin: 8px 0 0;">Вероятность события в день ~18%. Если 6 дней без события — на 7-й pity. Не больше одного события в день.</p>
+    </div>
+
+    <div class="card">
+      <strong>Phase 2 Freeze</strong>
+      <div id="phase2FreezeSummary" class="muted">Сводка готовности фазы 2 появится после инициализации.</div>
+      <div class="row" style="margin-top:8px;">
+        <button id="exportPhase2FreezeBtn" type="button" class="btn-secondary">Экспорт Phase 2 freeze отчёта</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>Phase 2 internal build (дни 42–45)</strong>
+      <div class="row" style="margin-top:8px;">
+        <button id="applyBalanceConservativeBtn" type="button" class="btn-secondary">Баланс preset: Conservative</button>
+        <button id="applyBalanceGrowthBtn" type="button" class="btn-secondary">Баланс preset: Growth</button>
+        <button id="runRegression7Btn" type="button" class="btn-secondary">Прогон регрессии 7 дней</button>
+        <button id="runPreReleaseBtn" type="button" class="btn-secondary">Pre-release run (1 клик)</button>
+        <button id="quickRestockBtn" type="button" class="btn-secondary">Антикризис: экстренное пополнение</button>
+        <button id="quickStabilizeBtn" type="button" class="btn-secondary">Антикризис: стабилизация маржи</button>
+        <button id="safeRecoveryV2Btn" type="button" class="btn-secondary">Safe recovery v2 (anti-stockout)</button>
+      </div>
+      <div id="regressionRunStatus" class="muted" style="margin-top:6px;">Регрессия: не запускалась.</div>
+      <div id="phase2BuildStatus" class="muted" style="margin-top:6px;">Сводка phase2 build появится после первой симуляции.</div>
+      <div id="releaseSmokeChecklist" class="muted" style="margin-top:8px;">Release smoke checklist появится после первой симуляции.</div>
+    </div>
+
+    <div class="card">
+      <strong>KPI Dashboard (день 13)</strong>
+      <div id="kpiDashboard" class="kpi-grid">
+        <div class="muted">Нет данных — сначала нажми Next Day.</div>
+      </div>
+      <div id="categoryKpiTable" class="muted" style="margin-top:8px;">Категорийный срез появится после первой симуляции.</div>
+      <div id="categoryRecommendations" class="muted" style="margin-top:8px;">Рекомендации по категориям появятся после первой симуляции.</div>
+    </div>
+
+    <div class="card">
+      <strong>Плейтест (день 19)</strong>
+      <div id="playtestChecklist" class="muted">Чеклист плейтеста появится здесь.</div>
+      <div class="row" style="align-items:flex-end; margin-top:8px;">
+        <label class="field" style="flex:1; min-width:260px;">Заметки по плейтесту
+          <textarea id="playtestNotesInput" rows="3" style="background:#252836;border:1px solid #2b2e3a;color:#e7e7ea;padding:6px 8px;border-radius:6px;resize:vertical;"></textarea>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>M1 Freeze (день 21)</strong>
+      <div id="freezeSummary" class="muted">Сводка готовности появится после первой симуляции.</div>
+      <div class="row" style="margin-top:8px;">
+        <button id="exportFreezeBtn" type="button" class="btn-secondary">Экспорт M1 freeze отчёта</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>Анти-тупик (день 12)</strong>
+      <div id="deadlockStatus" class="muted">Статус анти-тупика появится после первой симуляции.</div>
+      <div class="row" style="margin-top: 8px;">
+        <button id="rescueBtn" type="button" class="btn-secondary">Антикризисный аванс +20 000</button>
+        <span class="muted">Доступно только в тупике: нет остатков, нет поставок в пути, не хватает кэша на минимальную закупку.</span>
+      </div>
     </div>
 
     <div class="card">
@@ -88,7 +286,7 @@
     </div>
 
     <div class="card">
-      <strong>Разбивка затрат (последний симулированный день)</strong>
+      <strong>Разбивка затрат (день 14)</strong>
       <div id="costBreakdown" class="muted">Нет данных — сначала нажми Next Day.</div>
     </div>
 

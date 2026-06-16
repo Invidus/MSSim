@@ -92,11 +92,56 @@
   {
     "id": "beauty_tonic_10",
     "name": "Tonic",
+    "categoryId": "beauty",
     "tier": "low",
     "purchaseCost": 280,
     "recommendedPrice": 790,
     "baseDemand": 205,
     "baseReturnRate": 0.05,
     "leadTimeDays": 3
+  },
+  {
+    "id": "home_container_11",
+    "name": "Storage Container",
+    "categoryId": "home",
+    "tier": "low",
+    "purchaseCost": 190,
+    "recommendedPrice": 590,
+    "baseDemand": 185,
+    "baseReturnRate": 0.04,
+    "leadTimeDays": 3
+  },
+  {
+    "id": "home_towel_12",
+    "name": "Kitchen Towel Set",
+    "categoryId": "home",
+    "tier": "low",
+    "purchaseCost": 140,
+    "recommendedPrice": 420,
+    "baseDemand": 210,
+    "baseReturnRate": 0.03,
+    "leadTimeDays": 2
+  },
+  {
+    "id": "electronics_cable_13",
+    "name": "USB-C Cable",
+    "categoryId": "electronics",
+    "tier": "low",
+    "purchaseCost": 160,
+    "recommendedPrice": 490,
+    "baseDemand": 230,
+    "baseReturnRate": 0.05,
+    "leadTimeDays": 2
+  },
+  {
+    "id": "electronics_earbuds_14",
+    "name": "Wireless Earbuds",
+    "categoryId": "electronics",
+    "tier": "high",
+    "purchaseCost": 1450,
+    "recommendedPrice": 3490,
+    "baseDemand": 95,
+    "baseReturnRate": 0.11,
+    "leadTimeDays": 5
   }
 ]
