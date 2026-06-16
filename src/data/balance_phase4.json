@@ -1,0 +1,19 @@
+{
+  "returns": {
+    "qualityReference": 52,
+    "qualitySpan": 38,
+    "qualityReturnFloor": 0.68,
+    "playerLeverageMinReduction": 0.3,
+    "optimizedQuality": 90,
+    "optimizedReturnRateMod": 0.9,
+    "optimizedProgressionMult": 0.92
+  },
+  "events": {
+    "dailyChance": 0.18,
+    "pityDays": 6,
+    "maxActiveNegative": 2,
+    "maxReturnRateModMult": 1.1,
+    "targetEventsPer14Days": { "min": 1, "max": 4 },
+    "maxNegativeShare": 0.55
+  }
+}

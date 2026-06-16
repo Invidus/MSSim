@@ -1,0 +1,17 @@
+{
+  "minBrowsers": [
+    "Chrome 90+",
+    "Edge 90+",
+    "Firefox 90+",
+    "Yandex Browser 22+",
+    "Safari 15+ (ограниченная поддержка)"
+  ],
+  "requiredApis": [
+    "localStorage",
+    "fetch",
+    "Promise",
+    "ES modules",
+    "JSON"
+  ],
+  "optionalApis": ["clipboard", "structuredClone"]
+}

@@ -1,5 +1,6 @@
 import { computeAdTrafficTotal, computeConversionRate } from "./demandModel.js";
 import { computeCappedOrders } from "./salesModel.js";
+import { computeQualityReturnFactor } from "./balanceModel.js";
 
 /**
  * @param {object} state
@@ -106,7 +107,11 @@ export function simulateSalesDay(state, cfg) {
 
     const returnRateMod = Math.max(0, Number(state.returnRateMod) || 1) * returnEventMult;
     const skuReturnMult = Number(eventMods.skuReturnRateMult?.[skuId]) || 1;
-    const returnRate = Math.min(0.95, Math.max(0, sku.baseReturnRate * returnRateMod * skuReturnMult));
+    const qualityReturnFactor = computeQualityReturnFactor(qualityScore);
+    const returnRate = Math.min(
+      0.95,
+      Math.max(0, sku.baseReturnRate * returnRateMod * skuReturnMult * qualityReturnFactor)
+    );
     const returned = Math.round(orders * returnRate);
     const netSold = Math.max(orders - returned, 0);
 

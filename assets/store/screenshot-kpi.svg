@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#121318"/>
+  <text x="80" y="100" fill="#7a4cff" font-family="Arial,sans-serif" font-size="36" font-weight="700">KPI Dashboard</text>
+  <rect x="80" y="140" width="280" height="120" rx="12" fill="#1b1d25" stroke="#2b2e3a"/>
+  <rect x="380" y="140" width="280" height="120" rx="12" fill="#1b1d25" stroke="#2b2e3a"/>
+  <rect x="680" y="140" width="280" height="120" rx="12" fill="#1b1d25" stroke="#2b2e3a"/>
+  <text x="220" y="210" text-anchor="middle" fill="#8fd694" font-family="Arial,sans-serif" font-size="28">Маржа 18%</text>
+  <text x="520" y="210" text-anchor="middle" fill="#ffcc66" font-family="Arial,sans-serif" font-size="28">ACOS 22%</text>
+  <text x="820" y="210" text-anchor="middle" fill="#8fd694" font-family="Arial,sans-serif" font-size="28">Прибыль +12k</text>
+  <text x="640" y="650" text-anchor="middle" fill="#a9acb7" font-family="Arial,sans-serif" font-size="20">Screenshot placeholder — KPI</text>
+</svg>

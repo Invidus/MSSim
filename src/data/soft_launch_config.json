@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "listing": {
+    "title": "Marketplace Seller Simulator",
+    "tagline": "Управляй магазином на маркетплейсе: закупки, реклама, KPI и рост.",
+    "shortDescription": "Экономический симулятор продавца: балансируй маржу, stockout и возвраты в коротких дневных сессиях.",
+    "softLaunchNotes": "Софт-ланч: сбор обратной связи по балансу, онбордингу и удержанию в первых 14 днях рана."
+  },
+  "support": {
+    "title": "Поддержка и обратная связь",
+    "instruction": "Опишите проблему, выберите категорию и экспортируйте отчёт — приложите файл разработчикам.",
+    "channels": [
+      {
+        "id": "email",
+        "label": "Email",
+        "value": "lrf.nos@yandex.ru",
+        "kind": "email"
+      },
+      {
+        "id": "telegram",
+        "label": "Telegram",
+        "value": "https://t.me/+cqg3NoO6icM4ZDJi",
+        "kind": "link"
+      }
+    ]
+  },
+  "feedbackCategories": [
+    { "id": "bug", "label": "Баг / ошибка" },
+    { "id": "balance", "label": "Баланс / экономика" },
+    { "id": "ux", "label": "UX / интерфейс" },
+    { "id": "performance", "label": "Производительность" },
+    { "id": "other", "label": "Другое" }
+  ]
+}

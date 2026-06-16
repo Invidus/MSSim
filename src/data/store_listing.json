@@ -1,0 +1,76 @@
+{
+  "platform": "yandex-games",
+  "locale": "ru",
+  "title": "Симулятор продавца маркетплейса",
+  "titleEn": "Marketplace Seller Simulator",
+  "shortDescription": "Управляй магазином на маркетплейсе: закупки, реклама, KPI и рост. Короткие дневные сессии, 72 товара, события и прокачка.",
+  "longDescription": "Marketplace Seller Simulator — экономическая игра про продавца на маркетплейсе.\n\nЗакупайте товары, настраивайте цены и рекламу, следите за маржой, возвратами и рейтингом сервиса. Каждый день — новые решения: баланс между ростом выручки и операционными рисками.\n\nОсобенности:\n• 6 категорий и 72 SKU\n• KPI-дашборд, алерты и быстрые пресеты\n• События рынка и дерево прокачки из 34 узлов\n• Три стиля игры: маркетолог, оператор, ассортимент\n• Автосохранение и облачный прогресс на Яндекс Играх\n\nПодходит для коротких сессий 8–15 минут и длинных ранов до 28+ дней.",
+  "howToPlay": "1) Закупите товар на склад.\n2) Настройте цены, качество карточки и рекламный бюджет.\n3) Нажмите Next Day и анализируйте KPI.\n4) Разблокируйте узлы прогрессии и адаптируйте стратегию.",
+  "keywords": [
+    "симулятор",
+    "маркетплейс",
+    "экономика",
+    "бизнес",
+    "магазин",
+    "KPI",
+    "стратегия"
+  ],
+  "ageRating": "6+",
+  "category": "Симуляторы / Экономические",
+  "assets": {
+    "icon": {
+      "path": "assets/store/icon-512.png",
+      "width": 512,
+      "height": 512,
+      "format": "png",
+      "status": "ai-draft"
+    },
+    "cover": {
+      "path": "assets/store/cover-800x470.png",
+      "width": 800,
+      "height": 470,
+      "format": "png",
+      "status": "ai-draft"
+    },
+    "heroCover": {
+      "path": "assets/store/cover-hero-1560x520.png",
+      "width": 1560,
+      "height": 520,
+      "format": "png",
+      "status": "ai-draft"
+    },
+    "screenshots": [
+      {
+        "id": "s1",
+        "caption": "KPI-дашборд и итог дня",
+        "path": "assets/store/screenshot-kpi.svg",
+        "width": 1280,
+        "height": 720,
+        "status": "placeholder"
+      },
+      {
+        "id": "s2",
+        "caption": "Закупки, склад и карточки SKU",
+        "path": "assets/store/screenshot-stock.svg",
+        "width": 1280,
+        "height": 720,
+        "status": "placeholder"
+      },
+      {
+        "id": "s3",
+        "caption": "Прогрессия и стили игры",
+        "path": "assets/store/screenshot-progression.svg",
+        "width": 1280,
+        "height": 720,
+        "status": "placeholder"
+      }
+    ]
+  },
+  "moderationChecklist": [
+    "SDK /sdk.js подключён",
+    "Нет внешних ссылок в игровом UI",
+    "Реклама через Yandex SDK",
+    "Сохранение прогресса работает",
+    "Иконка и скриншоты загружены в консоль"
+  ]
+}

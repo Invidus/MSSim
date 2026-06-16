@@ -11,12 +11,79 @@ import {
   getPurchaseLeadTimeExtra,
   computeEventModifiers,
   defaultEventModifiers,
+  configureEventBalance,
 } from "./core/eventEngine.js";
 import { runAutoReprice, runAutoReorder } from "./core/automationModel.js";
 import { analyzeAntiExploit, inferDominantPlayStyle } from "./core/antiExploit.js";
 import { resolveOnboarding, getErrorHints, syncOnboardingProgress } from "./core/onboardingModel.js";
-import { saveToLocal, loadFromLocal } from "./persistence/saveLoad.js";
-import { initYandexSdk } from "./platform/yandexSdk.js";
+import { resolveBeginnerTier, getNextPlayerAction, beginnerTeaserText } from "./core/beginnerUiModel.js";
+import {
+  buildKpiChartPanels,
+  renderKpiChartsHtml,
+} from "./core/kpiChartsModel.js";
+import {
+  isTutorialActive,
+  resolveTutorialStep,
+  tutorialVisibleSections,
+  getTutorialContent,
+  syncTutorialCompletion,
+  migrateTutorialFlags,
+} from "./core/firstRunTutorial.js";
+import { getKpiAlerts } from "./core/kpiAlertsModel.js";
+import {
+  normalizeBalanceConfig,
+  auditReturnsLeverage,
+  auditEventIntensity,
+  buildPhase4BalanceReport,
+} from "./core/balanceModel.js";
+import {
+  normalizeSoftLaunchConfig,
+  buildSoftLaunchPackage,
+  buildFeedbackTriageReport,
+  createFeedbackEntry,
+} from "./core/softLaunchModel.js";
+import {
+  bumpSessionMetrics,
+  pushDailyTelemetry,
+  buildRetentionMetrics,
+  buildTriageSummary,
+  setFeedbackTriageStatus,
+  mergeFeedbackImport,
+  buildSoftLaunchAnalyticsReport,
+  normalizeFeedbackLog,
+  normalizeFeedbackEntry,
+  inferFeedbackPriority,
+} from "./core/telemetryModel.js";
+import {
+  normalizeRetentionGates,
+  normalizeMajorBugsCatalog,
+  auditMajorBugs,
+  buildPhase4CloseoutReport,
+  syncVisitMetrics,
+  finalizeVisitToCohort,
+  defaultVisitMetrics,
+  defaultRetentionCohort,
+} from "./core/retentionModel.js";
+import { runBrowserCompatChecks, applyReleaseUiMode } from "./platform/browserCompat.js";
+import { applyBeginnerUi, applyTutorialUi } from "./platform/playerUi.js";
+import { normalizeBuildManifest, buildReleaseReadinessReport, formatBytes } from "./core/buildModel.js";
+import {
+  normalizeStoreListing,
+  validateStoreListing,
+  buildStoreListingPackage,
+} from "./core/storeListingModel.js";
+import { saveToLocal, loadFromLocal, clearLocalSave, STORAGE_KEY } from "./persistence/saveLoad.js";
+import {
+  attachSaveMeta,
+  createCloudAdapter,
+  loadCloudSave,
+  saveCloudSave,
+  clearCloudSave,
+  resolveBestSave,
+  CLOUD_MOCK_KEY,
+  hasCloudMockSave,
+} from "./persistence/cloudSave.js";
+import { initYandexSdk, bindAccountSelectionHandlers, refreshYandexPlayer } from "./platform/yandexSdk.js";
 
 const defaultCategories = [
   { id: "beauty", name: "Beauty and Care", baseDemandMod: 1.15, baseMarginMod: 0.32, baseReturnRate: 0.07, volatility: 0.12 },
@@ -110,6 +177,16 @@ let progressionNodes = [];
 let progressionSynergies = [];
 let playStyles = [];
 let onboardingSteps = [];
+let qolPresets = [];
+let balancePhase4 = normalizeBalanceConfig(null);
+let softLaunchConfig = normalizeSoftLaunchConfig(null);
+let retentionGates = normalizeRetentionGates(null);
+let majorBugsCatalog = [];
+let buildManifest = normalizeBuildManifest(null);
+let browserCompatConfig = { optionalApis: ["clipboard", "structuredClone"] };
+/** @type {ReturnType<typeof runBrowserCompatChecks> | null} */
+let browserCompatResult = null;
+let storeListingConfig = normalizeStoreListing(null);
 const BALANCE_PRESETS = {
   conservative: {
     feeRate: 0.175,
@@ -151,7 +228,22 @@ let platformState = {
   checked: false,
   available: false,
   sdk: null,
+  player: null,
   message: "Проверка SDK…",
+};
+/** @type {{ label: string; load: () => Promise<object | null>; save: (state: object, flush?: boolean) => Promise<{ ok: boolean }>; clear: () => Promise<{ ok: boolean }> } | null} */
+let cloudAdapter = null;
+let cloudSyncPaused = false;
+let lastAutoSaveStatus = {
+  ok: true,
+  localOk: true,
+  cloudOk: true,
+  cloudSkipped: false,
+  cloudSource: "none",
+  at: null,
+  day: null,
+  error: null,
+  cloudError: null,
 };
 
 const els = {
@@ -187,6 +279,37 @@ const els = {
   exportPhase3FreezeBtn: document.getElementById("exportPhase3FreezeBtn"),
   onboardingPanel: document.getElementById("onboardingPanel"),
   hideOnboardingBtn: document.getElementById("hideOnboardingBtn"),
+  showAllSectionsBtn: document.getElementById("showAllSectionsBtn"),
+  skipTutorialBtn: document.getElementById("skipTutorialBtn"),
+  quickStartBtn: document.getElementById("quickStartBtn"),
+  kpiAlertsPanel: document.getElementById("kpiAlertsPanel"),
+  skuStockFilterSelect: document.getElementById("skuStockFilterSelect"),
+  skuSearchInput: document.getElementById("skuSearchInput"),
+  qolPresetsPanel: document.getElementById("qolPresetsPanel"),
+  phase4BalancePanel: document.getElementById("phase4BalancePanel"),
+  runBalanceSim14Btn: document.getElementById("runBalanceSim14Btn"),
+  exportPhase4BalanceBtn: document.getElementById("exportPhase4BalanceBtn"),
+  softLaunchPanel: document.getElementById("softLaunchPanel"),
+  supportChannelsPanel: document.getElementById("supportChannelsPanel"),
+  supportChannelStatus: document.getElementById("supportChannelStatus"),
+  feedbackCategorySelect: document.getElementById("feedbackCategorySelect"),
+  feedbackTextInput: document.getElementById("feedbackTextInput"),
+  submitFeedbackBtn: document.getElementById("submitFeedbackBtn"),
+  exportSoftLaunchBtn: document.getElementById("exportSoftLaunchBtn"),
+  exportFeedbackBtn: document.getElementById("exportFeedbackBtn"),
+  telemetryPanel: document.getElementById("telemetryPanel"),
+  triagePanel: document.getElementById("triagePanel"),
+  exportAnalyticsBtn: document.getElementById("exportAnalyticsBtn"),
+  importFeedbackBtn: document.getElementById("importFeedbackBtn"),
+  importFeedbackInput: document.getElementById("importFeedbackInput"),
+  phase4CloseoutPanel: document.getElementById("phase4CloseoutPanel"),
+  majorBugsPanel: document.getElementById("majorBugsPanel"),
+  exportPhase4CloseoutBtn: document.getElementById("exportPhase4CloseoutBtn"),
+  releaseBuildPanel: document.getElementById("releaseBuildPanel"),
+  browserCompatPanel: document.getElementById("browserCompatPanel"),
+  exportReleaseReadinessBtn: document.getElementById("exportReleaseReadinessBtn"),
+  storeListingPanel: document.getElementById("storeListingPanel"),
+  exportStoreListingBtn: document.getElementById("exportStoreListingBtn"),
   exportPhase2FreezeBtn: document.getElementById("exportPhase2FreezeBtn"),
   stateDump: document.getElementById("stateDump"),
   summary: document.getElementById("summary"),
@@ -213,6 +336,7 @@ const els = {
   campaignReadability: document.getElementById("campaignReadability"),
   categoryFilterSelect: document.getElementById("categoryFilterSelect"),
   kpiDashboard: document.getElementById("kpiDashboard"),
+  kpiChartsRow: document.getElementById("kpiChartsRow"),
   categoryKpiTable: document.getElementById("categoryKpiTable"),
   categoryRecommendations: document.getElementById("categoryRecommendations"),
   skuSelect: document.getElementById("skuSelect"),
@@ -457,9 +581,57 @@ function categoryById(id) {
 }
 
 function getVisibleSkus() {
-  if (!gameState?.selectedCategoryId) return gameState.skus;
-  const list = gameState.skus.filter((s) => s.categoryId === gameState.selectedCategoryId);
-  return list.length ? list : gameState.skus;
+  if (!gameState?.skus) return [];
+  let list = gameState.skus;
+  if (gameState.selectedCategoryId) {
+    const catList = list.filter((s) => s.categoryId === gameState.selectedCategoryId);
+    if (catList.length) list = catList;
+  }
+  const stockFilter = gameState.skuStockFilter || "all";
+  if (stockFilter !== "all") {
+    list = list.filter((sku) => {
+      const stock = Number(gameState.inStock[sku.id]) || 0;
+      const demand = Math.max(1, Number(sku.baseDemand) || 1);
+      if (stockFilter === "out_of_stock") return stock <= 0;
+      if (stockFilter === "in_stock") return stock > 0;
+      if (stockFilter === "low_stock") return stock > 0 && stock < demand * 1.5;
+      return true;
+    });
+  }
+  const q = String(gameState.skuSearchQuery || "")
+    .trim()
+    .toLowerCase();
+  if (q) {
+    list = list.filter(
+      (sku) =>
+        String(sku.name || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(sku.id || "")
+          .toLowerCase()
+          .includes(q)
+    );
+  }
+  return list;
+}
+
+function applySkuFiltersFromUi() {
+  if (!gameState) return;
+  if (els.skuStockFilterSelect instanceof HTMLSelectElement) {
+    gameState.skuStockFilter = String(els.skuStockFilterSelect.value || "all");
+  }
+  if (els.skuSearchInput instanceof HTMLInputElement) {
+    gameState.skuSearchQuery = String(els.skuSearchInput.value || "");
+  }
+}
+
+function syncSkuFiltersUiFromState() {
+  if (els.skuStockFilterSelect instanceof HTMLSelectElement) {
+    els.skuStockFilterSelect.value = gameState?.skuStockFilter || "all";
+  }
+  if (els.skuSearchInput instanceof HTMLInputElement) {
+    els.skuSearchInput.value = gameState?.skuSearchQuery || "";
+  }
 }
 
 /**
@@ -883,6 +1055,8 @@ function pushKpiHistorySnapshot() {
     stockoutRate: Number(k.stockoutRate) || 0,
     unmetUnits: Number(k.unmetUnits) || 0,
     daysOfStock: Number(k.daysOfStock) || 0,
+    ordersWanted: Number(gameState.lastDayReport?.totals?.ordersWanted) || 0,
+    adCost: Number(gameState.lastDayReport?.totals?.adCost) || 0,
   };
   const prev = Array.isArray(gameState.kpiHistory) ? gameState.kpiHistory : [];
   gameState.kpiHistory = [...prev, next].slice(-60);
@@ -1002,29 +1176,133 @@ function renderPlayStylesPanel() {
   els.playStylesPanel.innerHTML = buttons || `<span class="muted">Стили не загружены.</span>`;
 }
 
+function renderTutorialHero(content) {
+  if (!els.onboardingPanel || !content) return;
+  const ctaBlock = content.cta
+    ? `<div class="row" style="margin-top:12px"><button type="button" class="btn-primary js-beginner-cta" data-cta="${content.cta}">${content.ctaLabel}</button></div>`
+    : "";
+  els.onboardingPanel.innerHTML = `<div class="beginner-hero"><div class="beginner-step">Обучение · шаг ${content.step} из ${content.totalSteps}</div><h2>${content.title}</h2><p class="muted" style="margin:0">${content.body}</p>${ctaBlock}</div>`;
+}
+
+/** Сразу показывает шаг обучения (без ожидания async init). */
+function showTutorialShell(step = 1, state = gameState) {
+  const content = getTutorialContent(step, state);
+  if (!content) return;
+  applyTutorialUi(step, tutorialVisibleSections(step), !!content.highlightNextDay);
+  renderTutorialHero(content);
+}
+
 function renderOnboardingPanel() {
   if (!els.onboardingPanel) return;
-  if (!gameState || gameState.onboardingHidden) {
-    els.onboardingPanel.innerHTML = gameState?.onboardingHidden
-      ? `<span class="muted">Онбординг скрыт. Сброс игры вернёт подсказки.</span>`
-      : `<span class="muted">Онбординг загружается…</span>`;
+  if (!gameState) {
+    els.onboardingPanel.innerHTML = `<span class="muted">Загрузка…</span>`;
     return;
   }
+
+  const tutorialStep = resolveTutorialStep(gameState);
+  const tutorialContent =
+    isTutorialActive(gameState) && tutorialStep > 0 ? getTutorialContent(tutorialStep, gameState) : null;
+
+  if (tutorialContent) {
+    renderTutorialHero(tutorialContent);
+    return;
+  }
+
+  if (gameState.onboardingHidden) {
+    els.onboardingPanel.innerHTML = `<span class="muted">Подсказки скрыты. «Сброс рана» вернёт обучение.</span>`;
+    return;
+  }
+
   const view = resolveOnboarding(gameState, onboardingSteps);
+  const action = getNextPlayerAction(gameState, view);
   const hints = getErrorHints(gameState);
-  const pct = Math.round((view.progress || 0) * 100);
-  const stepBlock = view.allDone
-    ? `<div style="color:#8fd694"><b>Онбординг первого рана завершён.</b> Дальше — прогрессия и длинная кампания.</div>`
-    : `<div><b>${view.currentStep?.title || "Шаг"}</b></div><div class="muted" style="margin-top:4px">${view.currentStep?.body || ""}</div>`;
-  const hintRows = hints.length
-    ? hints
-        .map((h) => {
-          const c = h.severity === "high" ? "#ff8f8f" : h.severity === "medium" ? "#ffcc66" : "#a9acb7";
-          return `<li style="margin:4px 0;color:${c}">${h.text}</li>`;
-        })
-        .join("")
-    : `<li class="muted" style="margin:4px 0">Критичных подсказок нет — продолжайте рост.</li>`;
-  els.onboardingPanel.innerHTML = `<div>Прогресс онбординга: <b>${view.completed.length}/${view.totalSteps}</b> · <b>${pct}%</b></div>${stepBlock}<div style="margin-top:8px"><b>Подсказки по ошибкам</b><ul class="incoming">${hintRows}</ul></div>`;
+
+  if (view.allDone && !action) {
+    els.onboardingPanel.innerHTML = `<div style="color:#8fd694"><b>Базовый цикл освоен.</b> Развивайте магазин дальше.</div>`;
+    return;
+  }
+
+  const ctaBlock = action?.cta
+    ? `<div class="row" style="margin-top:12px"><button type="button" class="btn-primary js-beginner-cta" data-cta="${action.cta}">${action.ctaLabel}</button></div>`
+    : "";
+  const hero = action
+    ? `<div class="beginner-hero"><div class="beginner-step">Шаг ${action.step} из ${action.totalSteps}</div><h2>${action.title}</h2><p class="muted" style="margin:0">${action.body}</p>${ctaBlock}</div>`
+    : `<div class="muted">Следуйте подсказкам ниже.</div>`;
+
+  const hintRows = hints
+    .slice(0, 2)
+    .map((h) => {
+      const c = h.severity === "high" ? "#ff8f8f" : h.severity === "medium" ? "#ffcc66" : "#a9acb7";
+      return `<li style="margin:4px 0;color:${c}">${h.text}</li>`;
+    })
+    .join("");
+
+  const hintsBlock = hintRows
+    ? `<div style="margin-top:10px"><ul class="incoming">${hintRows}</ul></div>`
+    : "";
+
+  els.onboardingPanel.innerHTML = `${hero}${hintsBlock}`;
+}
+
+function finishTutorial() {
+  if (!gameState) return;
+  gameState.tutorialCompleted = true;
+  autoSaveGame({ silent: true });
+  render();
+}
+
+function skipTutorial() {
+  if (!gameState) return;
+  gameState.tutorialSkipped = true;
+  gameState.beginnerUiExpanded = true;
+  autoSaveGame({ silent: true });
+  render();
+}
+
+function renderBeginnerTeaser(tier) {
+  const el = document.getElementById("beginnerTeaser");
+  if (!(el instanceof HTMLElement)) return;
+  const text = beginnerTeaserText(tier);
+  if (!text) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `<b>Скоро откроется:</b> ${text}`;
+}
+
+function quickStartBuy() {
+  if (!gameState?.skus?.length) return;
+  const sku =
+    gameState.skus.find((s) => s.categoryId === "beauty" || s.categoryId === gameState.categories?.[0]?.id) ||
+    gameState.skus[0];
+  const qty = 80;
+  const totalCost = qty * sku.purchaseCost;
+  if (gameState.cash < totalCost) {
+    alert("Недостаточно денег для стартовой закупки.");
+    return;
+  }
+  gameState.cash -= totalCost;
+  gameState.inStock[sku.id] = (gameState.inStock[sku.id] || 0) + qty;
+  if (gameState.adBudget < 1500) {
+    gameState.adBudget = 1500;
+  }
+  if (els.skuSelect instanceof HTMLSelectElement) {
+    els.skuSelect.value = sku.id;
+  }
+  if (els.qtyInput instanceof HTMLInputElement) {
+    els.qtyInput.value = String(qty);
+  }
+  syncOnboardingProgress(gameState, onboardingSteps);
+  autoSaveGame({ silent: true });
+  render();
+}
+
+function expandAllPlayerSections() {
+  if (!gameState) return;
+  gameState.beginnerUiExpanded = true;
+  autoSaveGame({ silent: true });
+  render();
 }
 
 function hideOnboarding() {
@@ -1669,11 +1947,9 @@ function renderPhase2BuildStatus() {
   els.phase2BuildStatus.innerHTML = `<div><b>Решение phase2 internal build:</b> <span style="color:${color}"><b>${rep.decision}</b></span> · checks <b>${rep.passCount}/${rep.totalChecks}</b></div><div class="muted" style="margin-top:4px">${gatesLine}</div><div class="muted" style="margin-top:4px">${regLine}</div><div class="muted" style="margin-top:4px">${regRecoveryLine}</div><div class="muted" style="margin-top:4px">${autoLine}</div><div class="muted" style="margin-top:4px">${criticalLine}</div><div class="muted" style="margin-top:4px">${unmetLine}</div><ul class="incoming" style="margin-top:6px">${checksLine}</ul>`;
 }
 
-function renderReleaseSmokeChecklist() {
-  if (!els.releaseSmokeChecklist) return;
-  if (!gameState.lastDayReport?.totals) {
-    els.releaseSmokeChecklist.textContent = "Release smoke checklist появится после первой симуляции.";
-    return;
+function computeReleaseSmokeSummary() {
+  if (!gameState?.lastDayReport?.totals) {
+    return { checks: [], passCount: 0, totalChecks: 0, status: "NOT READY" };
   }
   const k = gameState.kpi || defaultKpi();
   const reg = gameState.phase2Regression;
@@ -1706,6 +1982,16 @@ function renderReleaseSmokeChecklist() {
   const passCount = checks.filter((x) => x.pass).length;
   const ratio = checks.length ? passCount / checks.length : 0;
   const status = ratio >= 0.85 ? "READY" : ratio >= 0.6 ? "READY WITH RISKS" : "NOT READY";
+  return { checks, passCount, totalChecks: checks.length, status, ratio };
+}
+
+function renderReleaseSmokeChecklist() {
+  if (!els.releaseSmokeChecklist) return;
+  if (!gameState.lastDayReport?.totals) {
+    els.releaseSmokeChecklist.textContent = "Release smoke checklist появится после первой симуляции.";
+    return;
+  }
+  const { checks, passCount, status } = computeReleaseSmokeSummary();
   const color = status === "READY" ? "#8fd694" : status === "READY WITH RISKS" ? "#ffcc66" : "#ff8f8f";
   const rows = checks
     .map((x) => `<li style="margin:4px 0"><span style="color:${x.pass ? "#8fd694" : "#ff8f8f"}">${x.pass ? "PASS" : "FAIL"}</span> — ${x.label}</li>`)
@@ -1722,6 +2008,589 @@ function kpiClassByValue(kind, value) {
   return "kpi-warn";
 }
 
+function renderKpiAlertsPanel() {
+  if (!els.kpiAlertsPanel) return;
+  const alerts = getKpiAlerts(gameState);
+  if (!gameState?.lastDayReport) {
+    els.kpiAlertsPanel.innerHTML = `<span class="muted">Алерты появятся после первой симуляции.</span>`;
+    return;
+  }
+  if (!alerts.length) {
+    els.kpiAlertsPanel.innerHTML = `<span style="color:#8fd694"><b>Всё в норме</b> — критических KPI-алертов нет.</span>`;
+    return;
+  }
+  const rows = alerts
+    .map((a) => {
+      const c = a.severity === "high" ? "#ff8f8f" : a.severity === "medium" ? "#ffcc66" : "#a9acb7";
+      return `<li style="margin:4px 0"><span style="color:${c}"><b>${a.title}</b></span> — ${a.text}</li>`;
+    })
+    .join("");
+  els.kpiAlertsPanel.innerHTML = `<ul class="incoming">${rows}</ul>`;
+}
+
+function applyQolPreset(presetId) {
+  const preset = qolPresets.find((p) => p.id === presetId);
+  if (!preset) return false;
+  switch (preset.action) {
+    case "play_style":
+      return applyPlayStyle(String(preset.param || "assortment"));
+    case "quick_restock":
+      runQuickEmergencyRestock();
+      return true;
+    case "quick_stabilize":
+      runQuickMarginStabilization();
+      return true;
+    case "safe_recovery":
+      runSafeRecoveryPresetV2();
+      return true;
+    default:
+      return false;
+  }
+}
+
+function renderQolPresetsPanel() {
+  if (!els.qolPresetsPanel) return;
+  const buttons = qolPresets
+    .map(
+      (p) =>
+        `<button type="button" class="btn-secondary js-qol-preset" data-preset-id="${p.id}" style="margin:4px 8px 4px 0" title="${p.desc || ""}"><b>${p.label}</b></button>`
+    )
+    .join("");
+  els.qolPresetsPanel.innerHTML =
+    buttons || `<span class="muted">Быстрые пресеты не загружены.</span>`;
+}
+
+function runBalanceSim14Days() {
+  const draft = JSON.parse(JSON.stringify(gameState));
+  applySafeRecoveryV2ToState(draft, { intensity: 1 });
+  let prevStockout = Number(draft?.kpi?.stockoutRate) || 0;
+  for (let i = 0; i < 14; i += 1) {
+    draft.day = (Number(draft.day) || 0) + 1;
+    processDailyEvents(draft, eventDefinitions);
+    refreshDerivedModifiers(draft);
+    processIncomingShipmentsForState(draft);
+    draft.adBudgetEffective = draft.adEnabled === false ? 0 : Math.max(0, Number(draft.adBudget) || 0);
+    const cfg = buildRegressionSafeConstants(draft, prevStockout, buildSimulationConstantsForState(draft));
+    simulateSalesDay(draft, cfg);
+    prevStockout = Number(draft.kpi?.stockoutRate) || 0;
+  }
+  gameState.phase4BalanceLastSim = {
+    generatedAt: new Date().toISOString(),
+    days: 14,
+    eventsAudit: auditEventIntensity(draft, 14),
+    returnsAudit: auditReturnsLeverage(draft, balancePhase4),
+    avgReturnPct: Number(draft.kpi?.returnPct) || 0,
+    avgStockout: Number(draft.kpi?.stockoutRate) || 0,
+  };
+  render();
+  return gameState.phase4BalanceLastSim;
+}
+
+function getPhase4BalanceReport() {
+  const sim = gameState?.phase4BalanceLastSim;
+  const eventsAudit = sim?.eventsAudit || auditEventIntensity(gameState, 14);
+  const returnsAudit = sim?.returnsAudit || auditReturnsLeverage(gameState, balancePhase4);
+  return buildPhase4BalanceReport(gameState, balancePhase4, returnsAudit, eventsAudit);
+}
+
+function renderPhase4BalancePanel() {
+  if (!els.phase4BalancePanel) return;
+  const ret = auditReturnsLeverage(gameState, balancePhase4);
+  const ev = gameState?.phase4BalanceLastSim?.eventsAudit || auditEventIntensity(gameState, 14);
+  const rep = getPhase4BalanceReport();
+  const color =
+    rep.decision === "BALANCED" ? "#8fd694" : rep.decision === "TUNE" ? "#ffcc66" : "#ff8f8f";
+  const checksLine = rep.checks
+    .map((c) => `<li style="margin:4px 0"><span style="color:${c.pass ? "#8fd694" : "#ff8f8f"}">${c.pass ? "PASS" : "FAIL"}</span> — ${c.label}</li>`)
+    .join("");
+  const simNote = gameState?.phase4BalanceLastSim
+    ? `Симуляция 14д: событий <b>${ev.total}</b> (neg ${ev.negative} / pos ${ev.positive}) · возвраты сейчас <b>${((gameState.phase4BalanceLastSim.avgReturnPct || 0) * 100).toFixed(1)}%</b>`
+    : `<span class="muted">Запустите симуляцию 14д для проверки интенсивности событий.</span>`;
+  els.phase4BalancePanel.innerHTML = `<div><b>Баланс 72–74:</b> <span style="color:${color}"><b>${rep.decision}</b></span> · checks <b>${rep.passCount}/${rep.totalChecks}</b></div><div class="muted" style="margin-top:6px">Возвраты: baseline <b>${(ret.baselineRate * 100).toFixed(1)}%</b> → оптимизация <b>${(ret.optimizedRate * 100).toFixed(1)}%</b> (снижение <b>${ret.reductionPct.toFixed(0)}%</b>, нужно >= ${ret.minRequiredPct.toFixed(0)}%)</div><div class="muted" style="margin-top:4px">${simNote}</div><ul class="incoming" style="margin-top:6px">${checksLine}</ul>`;
+}
+
+function exportPhase4BalanceReportFile() {
+  try {
+    const payload = JSON.stringify(getPhase4BalanceReport(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mssim-phase4-balance-day-${gameState.day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportPhase4BalanceReportFile failed", e);
+    alert("Не удалось экспортировать отчёт баланса: " + String(e));
+  }
+}
+
+function buildSoftLaunchContext() {
+  const releaseSmoke = computeReleaseSmokeSummary();
+  const phase3Freeze = buildPhase3FreezeReport();
+  const returnsAudit = auditReturnsLeverage(gameState, balancePhase4);
+  return {
+    gameState,
+    eventCount: eventDefinitions.length,
+    platform: platformState,
+    cloudSource: cloudAdapter?.label || lastAutoSaveStatus.cloudSource || "none",
+    lastAutoSave: { ...lastAutoSaveStatus },
+    config: softLaunchConfig,
+    onboarding: resolveOnboarding(gameState, onboardingSteps),
+    phase3Freeze,
+    phase4Balance: getPhase4BalanceReport(),
+    releaseSmoke,
+    feedbackLog: gameState?.feedbackLog || [],
+    readiness: {
+      sdkChecked: platformState.checked,
+      localSaveOk: lastAutoSaveStatus.localOk !== false,
+      cloudSource: cloudAdapter?.label || lastAutoSaveStatus.cloudSource || "none",
+      onboardingSteps: onboardingSteps.length,
+      skuCount: gameState?.skus?.length || 0,
+      eventCount: eventDefinitions.length,
+      balanceReturnsPass: returnsAudit.pass,
+      phase3Decision: phase3Freeze?.decision || "NO-GO",
+      releaseSmokeStatus: releaseSmoke.status,
+      supportChannels: softLaunchConfig.support?.channels?.length || 0,
+    },
+  };
+}
+
+function getSoftLaunchPackage() {
+  return buildSoftLaunchPackage(buildSoftLaunchContext());
+}
+
+function getFeedbackTriageReport() {
+  return buildFeedbackTriageReport(buildSoftLaunchContext());
+}
+
+function fillFeedbackCategorySelect() {
+  if (!(els.feedbackCategorySelect instanceof HTMLSelectElement)) return;
+  const cats = softLaunchConfig.feedbackCategories || [];
+  els.feedbackCategorySelect.innerHTML = cats
+    .map((c) => `<option value="${c.id}">${c.label}</option>`)
+    .join("");
+  const preferred = gameState?.feedbackDraftCategory || cats[0]?.id || "other";
+  if ([...els.feedbackCategorySelect.options].some((o) => o.value === preferred)) {
+    els.feedbackCategorySelect.value = preferred;
+  }
+}
+
+function submitFeedbackEntry() {
+  const categoryId =
+    els.feedbackCategorySelect instanceof HTMLSelectElement
+      ? els.feedbackCategorySelect.value
+      : gameState?.feedbackDraftCategory || "other";
+  const text =
+    els.feedbackTextInput instanceof HTMLTextAreaElement ? els.feedbackTextInput.value : "";
+  const entry = normalizeFeedbackEntry(
+    createFeedbackEntry(gameState, categoryId, text, {
+      priority: inferFeedbackPriority(categoryId),
+    })
+  );
+  if (!entry) {
+    alert("Введите текст обратной связи.");
+    return;
+  }
+  if (!Array.isArray(gameState.feedbackLog)) gameState.feedbackLog = [];
+  gameState.feedbackLog.push(entry);
+  gameState.feedbackDraftCategory = categoryId;
+  if (els.feedbackTextInput instanceof HTMLTextAreaElement) {
+    els.feedbackTextInput.value = "";
+  }
+  autoSaveGame({ silent: true });
+  render();
+}
+
+function escapeAttr(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
+async function activateSupportChannel(kind, value) {
+  const v = String(value || "").trim();
+  if (!v) return;
+  let msg = "";
+  if (kind === "email") {
+    try {
+      await navigator.clipboard.writeText(v);
+      msg = `<span style="color:#8fd694">Почта скопирована в буфер обмена.</span>`;
+    } catch (_) {
+      msg = `<span style="color:#ff8f8f">Не удалось скопировать. Разрешите доступ к буферу обмена.</span>`;
+    }
+  } else {
+    const win = window.open(v, "_blank", "noopener,noreferrer");
+    msg = win
+      ? `Открыта ссылка поддержки.`
+      : `Разрешите всплывающие окна или откройте ссылку вручную: <b>${v}</b>`;
+  }
+  if (els.supportChannelStatus) {
+    els.supportChannelStatus.innerHTML = msg;
+  }
+}
+
+function renderSupportChannels() {
+  if (!els.supportChannelsPanel) return;
+  const buttons = (softLaunchConfig.support?.channels || [])
+    .map((ch) => {
+      const v = escapeAttr(ch.value);
+      const label = escapeAttr(ch.label);
+      if (ch.kind === "email") {
+        return `<button type="button" class="btn-secondary js-support-channel" data-support-kind="email" data-support-value="${v}">✉ ${label}</button>`;
+      }
+      return `<button type="button" class="btn-secondary js-support-channel" data-support-kind="link" data-support-value="${v}">↗ ${label}</button>`;
+    })
+    .join("");
+  els.supportChannelsPanel.innerHTML =
+    buttons || `<span class="muted">Каналы поддержки не настроены.</span>`;
+}
+
+function renderSoftLaunchPanel() {
+  if (!els.softLaunchPanel) return;
+  fillFeedbackCategorySelect();
+  renderSupportChannels();
+  const pkg = getSoftLaunchPackage();
+  const color =
+    pkg.decision === "GO" ? "#8fd694" : pkg.decision === "GO WITH RISKS" ? "#ffcc66" : "#ff8f8f";
+  const checksLine = (pkg.readiness?.checks || [])
+    .map(
+      (c) =>
+        `<li style="margin:4px 0"><span style="color:${c.pass ? "#8fd694" : "#ff8f8f"}">${c.pass ? "PASS" : "FAIL"}</span> — ${c.label}</li>`
+    )
+    .join("");
+  const feedbackCount = (gameState?.feedbackLog || []).length;
+  const listing = softLaunchConfig.listing || {};
+  els.softLaunchPanel.innerHTML = `<div><b>Софт-ланч:</b> <span style="color:${color}"><b>${pkg.decision}</b></span> · checks <b>${pkg.passCount}/${pkg.totalChecks}</b> · feedback <b>${feedbackCount}</b></div><div class="muted" style="margin-top:6px"><b>${listing.title || "MSSIM"}</b> — ${listing.tagline || ""}</div><div class="muted" style="margin-top:4px">${softLaunchConfig.support?.instruction || ""}</div><ul class="incoming" style="margin-top:6px">${checksLine}</ul>`;
+}
+
+function getSoftLaunchAnalytics() {
+  return buildSoftLaunchAnalyticsReport(buildSoftLaunchContext());
+}
+
+function renderTelemetryPanel() {
+  if (!els.telemetryPanel) return;
+  const retention = buildRetentionMetrics(gameState);
+  const sessions = gameState?.sessionMetrics || {};
+  const points = (gameState?.telemetryLog || []).length;
+  const d1Color = retention.proxyD1Return ? "#8fd694" : "#ffcc66";
+  const d14Color = retention.firstRunCompletionProxy ? "#8fd694" : "#a9acb7";
+  els.telemetryPanel.innerHTML = `<div>Сессий: <b>${retention.sessionsStarted}</b> · день рана: <b>${retention.currentDay}</b> · точек телеметрии: <b>${points}</b></div><div class="muted" style="margin-top:4px">D1 return (прокси): <span style="color:${d1Color}"><b>${retention.proxyD1Return ? "да" : "нет"}</b></span> · день 7: <b>${retention.reachedDay7 ? "да" : "нет"}</b> · день 14: <b>${retention.reachedDay14 ? "да" : "нет"}</b> · завершение 1-го рана (прокси): <span style="color:${d14Color}"><b>${retention.firstRunCompletionProxy ? "да" : "нет"}</b></span></div><div class="muted" style="margin-top:4px">Первая сессия: ${sessions.firstPlayAt ? new Date(sessions.firstPlayAt).toLocaleString("ru-RU") : "—"} · последняя: ${sessions.lastPlayAt ? new Date(sessions.lastPlayAt).toLocaleString("ru-RU") : "—"}</div>`;
+}
+
+function renderTriagePanel() {
+  if (!els.triagePanel) return;
+  gameState.feedbackLog = normalizeFeedbackLog(gameState.feedbackLog);
+  const summary = buildTriageSummary(gameState.feedbackLog);
+  const rows = [...gameState.feedbackLog]
+    .reverse()
+    .slice(0, 8)
+    .map((entry) => {
+      const priColor =
+        entry.priority === "high" ? "#ff8f8f" : entry.priority === "medium" ? "#ffcc66" : "#a9acb7";
+      const status = entry.triageStatus || "open";
+      const short = String(entry.text || "").slice(0, 72);
+      return `<li style="margin:6px 0"><span style="color:${priColor}"><b>${entry.priority}</b></span> · <b>${entry.categoryId}</b> · день ${entry.day} · <span class="muted">${short}${entry.text?.length > 72 ? "…" : ""}</span><div class="row" style="margin-top:4px">${["open", "investigating", "resolved", "wontfix"]
+        .map(
+          (st) =>
+            `<button type="button" class="btn-secondary js-triage-status" data-entry-id="${escapeAttr(entry.id)}" data-triage-status="${st}" style="padding:4px 8px;font-size:12px;${status === st ? "outline:1px solid #7a4cff" : ""}">${st}</button>`
+        )
+        .join("")}</div></li>`;
+    })
+    .join("");
+  els.triagePanel.innerHTML = `<div>Триаж: открыто <b>${summary.openForTriage}</b> / всего <b>${summary.total}</b> · high <b>${summary.byPriority.high || 0}</b> · med <b>${summary.byPriority.medium || 0}</b> · low <b>${summary.byPriority.low || 0}</b></div><ul class="incoming" style="margin-top:6px">${rows || "<li class='muted'>Нет записей — отправьте feedback выше.</li>"}</ul>`;
+}
+
+function updateFeedbackTriage(entryId, status) {
+  if (!setFeedbackTriageStatus(gameState.feedbackLog, entryId, status)) return;
+  autoSaveGame({ silent: true });
+  render();
+}
+
+function getPhase4CloseoutReport() {
+  return buildPhase4CloseoutReport({
+    gameState,
+    gates: retentionGates,
+    majorBugsCatalog,
+    majorBugStatus: gameState?.majorBugStatus || {},
+    feedbackLog: gameState?.feedbackLog || [],
+  });
+}
+
+function setMajorBugStatus(bugId, status) {
+  if (!gameState) return;
+  if (!gameState.majorBugStatus || typeof gameState.majorBugStatus !== "object") {
+    gameState.majorBugStatus = {};
+  }
+  gameState.majorBugStatus[String(bugId)] = String(status);
+  autoSaveGame({ silent: true });
+  render();
+}
+
+function renderMajorBugsPanel() {
+  if (!els.majorBugsPanel) return;
+  const audit = auditMajorBugs(majorBugsCatalog, gameState?.majorBugStatus, gameState?.feedbackLog);
+  const rows = audit.registry
+    .map((b) => {
+      const color =
+        b.status === "fixed" ? "#8fd694" : b.status === "wontfix" ? "#a9acb7" : "#ff8f8f";
+      const actions =
+        b.status === "open" || b.status === "investigating"
+          ? `<button type="button" class="btn-secondary js-major-bug-fix" data-bug-id="${escapeAttr(b.id)}" style="padding:4px 8px;font-size:12px;margin-left:6px">Закрыть</button>`
+          : "";
+      return `<li style="margin:4px 0"><span style="color:${color}"><b>${b.status}</b></span> · <b>${b.id}</b> — ${b.title}${actions}</li>`;
+    })
+    .join("");
+  els.majorBugsPanel.innerHTML = `<div>Major-баги: открыто <b>${audit.openMajorTotal}</b> (реестр <b>${audit.openRegistry}</b> + feedback high <b>${audit.openHighFeedback}</b>) · лимит <b>${retentionGates.maxOpenMajorBugs}</b></div><ul class="incoming" style="margin-top:6px">${rows || "<li class='muted'>Реестр пуст.</li>"}</ul>`;
+}
+
+function renderPhase4CloseoutPanel() {
+  if (!els.phase4CloseoutPanel) return;
+  syncVisitMetrics(gameState);
+  const rep = getPhase4CloseoutReport();
+  const color =
+    rep.decision === "GO"
+      ? "#8fd694"
+      : rep.decision === "GO WITH RISKS" || rep.decision === "COLLECTING DATA"
+        ? "#ffcc66"
+        : "#ff8f8f";
+  const checksLine = rep.retentionGates.checks
+    .map((c) => {
+      const mark = c.pass === null ? "…" : c.pass ? "PASS" : "FAIL";
+      const markColor = c.pass === null ? "#a9acb7" : c.pass ? "#8fd694" : "#ff8f8f";
+      const extra = c.value != null ? ` <span class="muted">(${c.value})</span>` : "";
+      return `<li style="margin:4px 0"><span style="color:${markColor}">${mark}</span> — ${c.label}${extra}</li>`;
+    })
+    .join("");
+  const cohort = rep.retentionGates.cohort;
+  els.phase4CloseoutPanel.innerHTML = `<div><b>Фаза 4 closeout (79–80):</b> <span style="color:${color}"><b>${rep.decision}</b></span> · checks <b>${rep.passCount}/${rep.totalChecks}</b>${rep.retentionGates.pendingDataChecks ? ` · ожидание данных: <b>${rep.retentionGates.pendingDataChecks}</b>` : ""}</div><div class="muted" style="margin-top:6px">Когорта визитов: <b>${cohort.visitDenominator}</b> (нужно >= ${cohort.minVisitsRequired} для %) · D1 <b>${cohort.d1ReturnPct.toFixed(0)}%</b> · день 14 <b>${cohort.day14Pct.toFixed(0)}%</b></div><ul class="incoming" style="margin-top:6px">${checksLine}</ul>`;
+}
+
+function getReleaseReadinessReport() {
+  return buildReleaseReadinessReport(buildManifest, browserCompatResult || runBrowserCompatChecks(browserCompatConfig));
+}
+
+function renderBrowserCompatPanel() {
+  if (!els.browserCompatPanel) return;
+  const compat = browserCompatResult || runBrowserCompatChecks(browserCompatConfig);
+  const color = compat.supported ? "#8fd694" : "#ff8f8f";
+  const rows = compat.checks
+    .map((c) => {
+      const mark = c.pass ? "PASS" : c.required ? "FAIL" : "WARN";
+      const markColor = c.pass ? "#8fd694" : c.required ? "#ff8f8f" : "#ffcc66";
+      return `<li style="margin:4px 0"><span style="color:${markColor}">${mark}</span> — ${c.label}${c.required ? "" : " <span class='muted'>(опц.)</span>"}</li>`;
+    })
+    .join("");
+  const browsers = (browserCompatConfig.minBrowsers || [])
+    .map((b) => `<li style="margin:2px 0">${b}</li>`)
+    .join("");
+  els.browserCompatPanel.innerHTML = `<div>Браузер: <span style="color:${color}"><b>${compat.supported ? "совместим" : "не поддерживается"}</b></span> · checks <b>${compat.passCount}/${compat.totalChecks}</b></div><ul class="incoming" style="margin-top:6px">${rows}</ul><div class="muted" style="margin-top:6px">Целевые браузеры:</div><ul class="incoming">${browsers}</ul>`;
+}
+
+function renderReleaseBuildPanel() {
+  if (!els.releaseBuildPanel) return;
+  const m = buildManifest;
+  const rep = getReleaseReadinessReport();
+  const color =
+    rep.decision === "READY" ? "#8fd694" : rep.decision === "READY WITH RISKS" ? "#ffcc66" : "#ff8f8f";
+  const checksLine = rep.checks
+    .map(
+      (c) =>
+        `<li style="margin:4px 0"><span style="color:${c.pass ? "#8fd694" : "#ff8f8f"}">${c.pass ? "PASS" : "FAIL"}</span> — ${c.label}</li>`
+    )
+    .join("");
+  const sizeLine =
+    m.totalBytes > 0
+      ? `Размер: <b>${formatBytes(m.totalBytes)}</b> · файлов <b>${m.fileCount}</b>`
+      : `<span class="muted">Dev-режим — запустите <code>npm run build</code></span>`;
+  els.releaseBuildPanel.innerHTML = `<div><b>Release build:</b> <span style="color:${color}"><b>${rep.decision}</b></span> · v<b>${m.version}</b> · mode <b>${m.mode}</b></div><div class="muted" style="margin-top:6px">${sizeLine}${m.builtAt ? ` · сборка ${new Date(m.builtAt).toLocaleString("ru-RU")}` : ""}</div><ul class="incoming" style="margin-top:6px">${checksLine}</ul>`;
+}
+
+function exportReleaseReadinessFile() {
+  try {
+    const payload = JSON.stringify(getReleaseReadinessReport(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mssim-release-readiness-day-${gameState.day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportReleaseReadinessFile failed", e);
+    alert("Не удалось экспортировать отчёт: " + String(e));
+  }
+}
+
+function getStoreListingValidation() {
+  return validateStoreListing(storeListingConfig);
+}
+
+function getStoreListingPackage() {
+  const validation = getStoreListingValidation();
+  return buildStoreListingPackage(storeListingConfig, validation);
+}
+
+function renderStoreListingPanel() {
+  if (!els.storeListingPanel) return;
+  const pkg = getStoreListingPackage();
+  const l = pkg.listing;
+  const color =
+    pkg.decision === "READY" ? "#8fd694" : pkg.decision === "READY WITH RISKS" ? "#ffcc66" : "#ff8f8f";
+  const checksLine = pkg.validation.checks
+    .map(
+      (c) =>
+        `<li style="margin:4px 0"><span style="color:${c.pass ? "#8fd694" : "#ff8f8f"}">${c.pass ? "PASS" : "FAIL"}</span> — ${c.label}${c.value !== undefined && c.value !== "" ? ` <span class="muted">(${c.value})</span>` : ""}</li>`
+    )
+    .join("");
+  const assetsLine = [
+    l.assets.icon ? `<li style="margin:4px 0">Иконка: <code>${l.assets.icon.path}</code> · ${l.assets.icon.status}</li>` : "",
+    l.assets.cover ? `<li style="margin:4px 0">Обложка: <code>${l.assets.cover.path}</code> · ${l.assets.cover.status}</li>` : "",
+    l.assets.heroCover
+      ? `<li style="margin:4px 0">Витрина: <code>${l.assets.heroCover.path}</code> · ${l.assets.heroCover.status}</li>`
+      : "",
+    ...(l.assets.screenshots || []).map(
+      (s) =>
+        `<li style="margin:4px 0">Скрин ${s.id}: <code>${s.path}</code> — ${s.caption || ""} · ${s.status}</li>`
+    ),
+  ].join("");
+  const modLine = (l.moderationChecklist || [])
+    .map((item) => `<li style="margin:2px 0">${item}</li>`)
+    .join("");
+  els.storeListingPanel.innerHTML = `<div><b>Витрина ЯИ:</b> <span style="color:${color}"><b>${pkg.decision}</b></span> · checks <b>${pkg.passCount}/${pkg.totalChecks}</b></div><div style="margin-top:8px"><b>${l.title}</b></div><div class="muted" style="margin-top:4px">${l.shortDescription}</div><ul class="incoming" style="margin-top:8px">${checksLine}</ul><div class="muted" style="margin-top:8px">Ассеты (placeholder SVG — заменить PNG перед публикацией):</div><ul class="incoming">${assetsLine}</ul><div class="muted" style="margin-top:8px">Модерация:</div><ul class="incoming">${modLine}</ul>`;
+}
+
+function exportStoreListingFile() {
+  try {
+    const payload = JSON.stringify(getStoreListingPackage(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mssim-store-listing.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportStoreListingFile failed", e);
+    alert("Не удалось экспортировать витрину: " + String(e));
+  }
+}
+
+function exportPhase4CloseoutFile() {
+  try {
+    const payload = JSON.stringify(getPhase4CloseoutReport(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mssim-phase4-closeout-day-${gameState.day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportPhase4CloseoutFile failed", e);
+    alert("Не удалось экспортировать closeout: " + String(e));
+  }
+}
+
+function exportSoftLaunchAnalyticsFile() {
+  try {
+    const payload = JSON.stringify(getSoftLaunchAnalytics(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mssim-analytics-day-${gameState.day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportSoftLaunchAnalyticsFile failed", e);
+    alert("Не удалось экспортировать аналитику: " + String(e));
+  }
+}
+
+function importFeedbackTriageFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const raw = JSON.parse(String(reader.result || ""));
+      const imported = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw.entries)
+          ? raw.entries
+          : Array.isArray(raw.feedbackEntries)
+            ? raw.feedbackEntries
+            : [];
+      gameState.feedbackLog = mergeFeedbackImport(gameState.feedbackLog, imported);
+      autoSaveGame({ silent: true });
+      render();
+      alert(`Импортировано записей: ${imported.length}`);
+    } catch (e) {
+      console.warn("importFeedbackTriageFile failed", e);
+      alert("Не удалось импортировать feedback: " + String(e));
+    }
+  };
+  reader.onerror = () => alert("Ошибка чтения файла.");
+  reader.readAsText(file, "utf-8");
+}
+
+function exportSoftLaunchPackageFile() {
+  try {
+    const payload = JSON.stringify(getSoftLaunchPackage(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mssim-soft-launch-package-day-${gameState.day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportSoftLaunchPackageFile failed", e);
+    alert("Не удалось экспортировать пакет софт-ланча: " + String(e));
+  }
+}
+
+function exportFeedbackTriageFile() {
+  try {
+    const payload = JSON.stringify(getFeedbackTriageReport(), null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mssim-feedback-triage-day-${gameState.day}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn("exportFeedbackTriageFile failed", e);
+    alert("Не удалось экспортировать отчёт обратной связи: " + String(e));
+  }
+}
+
+function renderKpiCharts() {
+  if (!els.kpiChartsRow) return;
+  if (!gameState?.lastDayReport) {
+    els.kpiChartsRow.innerHTML = `<div class="muted">Графики появятся после первого дня.</div>`;
+    return;
+  }
+  const panels = buildKpiChartPanels(gameState);
+  els.kpiChartsRow.innerHTML = renderKpiChartsHtml(panels);
+}
+
 function renderKpiDashboard() {
   if (!els.kpiDashboard) return;
   if (!gameState.lastDayReport) {
@@ -1730,7 +2599,14 @@ function renderKpiDashboard() {
   }
 
   const k = gameState.kpi;
-  const cards = [
+  const tutorialSimple = isTutorialActive(gameState) && resolveTutorialStep(gameState) === 3;
+  const cards = tutorialSimple
+    ? [
+        { kind: "revenue", title: "Выручка", value: money(k.revenue), cls: "kpi-good" },
+        { kind: "profit", title: "Прибыль", value: money(k.profit), cls: kpiClassByValue("profit", k.profit) },
+        { kind: "marginPct", title: "Маржа", value: `${k.marginPct.toFixed(1)}%`, cls: kpiClassByValue("marginPct", k.marginPct) },
+      ]
+    : [
     { kind: "revenue", title: "Выручка (чистая)", value: money(k.revenue), cls: "kpi-good" },
     { kind: "profit", title: "Прибыль", value: money(k.profit), cls: kpiClassByValue("profit", k.profit) },
     { kind: "marginPct", title: "Маржа", value: `${k.marginPct.toFixed(1)}%`, cls: kpiClassByValue("marginPct", k.marginPct) },
@@ -1857,21 +2733,83 @@ function syncReturnsUiFromState() {
 async function ensurePlatformReady() {
   if (platformState.checked) return platformState;
   const res = await initYandexSdk();
+  cloudAdapter = createCloudAdapter(res);
   platformState = {
     checked: true,
     available: !!res.available,
     sdk: res.sdk || null,
+    player: res.player || null,
     message: res.available
-      ? "Yandex SDK: подключён (режим платформы)."
-      : "Yandex SDK: недоступен, fallback на обычный веб-режим.",
+      ? res.player
+        ? "Yandex SDK: подключён · облачное сохранение активно."
+        : "Yandex SDK: подключён · облако через mock (getPlayer недоступен)."
+      : "Yandex SDK: недоступен · облако через local mock, localStorage как резерв.",
   };
+  bindAccountSelectionHandlers(res.sdk, {
+    onOpen: () => {
+      cloudSyncPaused = true;
+      console.log("Yandex: диалог выбора аккаунта — синхронизация облака приостановлена");
+    },
+    onClose: async () => {
+      cloudSyncPaused = false;
+      await reloadFromCloudAfterAccountSwitch();
+    },
+  });
+  lastAutoSaveStatus.cloudSource = cloudAdapter?.label || "none";
   return platformState;
+}
+
+async function reloadFromCloudAfterAccountSwitch() {
+  const player = await refreshYandexPlayer(platformState.sdk);
+  platformState.player = player;
+  cloudAdapter = createCloudAdapter({ player, sdk: platformState.sdk });
+  const cloudRaw = await loadCloudSave(cloudAdapter);
+  if (!cloudRaw || !applyLoadedState(cloudRaw)) {
+    console.warn("Account switch: cloud save missing or invalid");
+    renderSdkStatus();
+    return;
+  }
+  saveToLocal(attachSaveMeta(cloudRaw, "cloud"));
+  bootstrapUiAfterStateChange();
+  render();
+  console.log("Account switch: loaded cloud save, day", gameState.day);
+}
+
+/**
+ * @returns {Promise<{ state: object; source: "local" | "cloud" } | null>}
+ */
+async function loadHybridSave() {
+  const localRaw = loadFromLocal();
+  const cloudRaw = await loadCloudSave(cloudAdapter);
+  return resolveBestSave(localRaw, cloudRaw);
+}
+
+/**
+ * @param {{ source: "local" | "cloud"; state: object }} picked
+ */
+async function syncSavesAfterLoad(picked) {
+  const snapshot = attachSaveMeta(picked.state, picked.source);
+  if (picked.source === "cloud") {
+    saveToLocal(snapshot);
+    return;
+  }
+  if (!cloudSyncPaused) {
+    await saveCloudSave(cloudAdapter, snapshot, false);
+  }
 }
 
 function renderSdkStatus() {
   if (!els.sdkStatus) return;
   const color = platformState.available ? "#8fd694" : "#ffcc66";
-  els.sdkStatus.innerHTML = `<span style="color:${color}">${platformState.message}</span>`;
+  const cloudLabel = cloudAdapter?.label || "none";
+  const cloudColor = lastAutoSaveStatus.cloudOk === false ? "#ff8f8f" : "#a9acb7";
+  const cloudLine =
+    cloudLabel === "none"
+      ? "Облако: недоступно"
+      : lastAutoSaveStatus.cloudSkipped
+        ? `Облако (${cloudLabel}): ожидание`
+        : `Облако (${cloudLabel}): ${lastAutoSaveStatus.cloudOk === false ? "ошибка" : "синхронизировано"}`;
+  els.sdkStatus.innerHTML = `<span style="color:${color}">${platformState.message}</span><br/><span style="color:${cloudColor}" class="muted">${cloudLine}</span>`;
 }
 
 function canClaimRewardedNow() {
@@ -2048,6 +2986,49 @@ async function loadOnboardingCatalog() {
   onboardingSteps = Array.isArray(steps) ? steps : [];
 }
 
+async function loadQolCatalog() {
+  const presets = await loadJson("./src/data/qol_presets.json", []);
+  qolPresets = Array.isArray(presets) ? presets : [];
+}
+
+async function loadBalancePhase4Catalog() {
+  const raw = await loadJson("./src/data/balance_phase4.json", null);
+  balancePhase4 = normalizeBalanceConfig(raw);
+  configureEventBalance({
+    maxActiveNegative: balancePhase4.events.maxActiveNegative,
+    maxReturnRateModMult: balancePhase4.events.maxReturnRateModMult,
+    dailyChance: balancePhase4.events.dailyChance,
+    pityDays: balancePhase4.events.pityDays,
+  });
+}
+
+async function loadSoftLaunchCatalog() {
+  const raw = await loadJson("./src/data/soft_launch_config.json", null);
+  softLaunchConfig = normalizeSoftLaunchConfig(raw);
+}
+
+async function loadRetentionCatalog() {
+  const [gates, bugs] = await Promise.all([
+    loadJson("./src/data/retention_gates.json", null),
+    loadJson("./src/data/major_bugs.json", { bugs: [] }),
+  ]);
+  retentionGates = normalizeRetentionGates(gates);
+  majorBugsCatalog = normalizeMajorBugsCatalog(bugs);
+}
+
+async function loadReleaseCatalog() {
+  const [manifest, compat, listing] = await Promise.all([
+    loadJson("./src/data/build_manifest.json", null),
+    loadJson("./src/data/browser_compat.json", {}),
+    loadJson("./src/data/store_listing.json", null),
+  ]);
+  buildManifest = normalizeBuildManifest(manifest);
+  browserCompatConfig = compat && typeof compat === "object" ? compat : browserCompatConfig;
+  browserCompatResult = runBrowserCompatChecks(browserCompatConfig);
+  storeListingConfig = normalizeStoreListing(listing);
+  applyReleaseUiMode(buildManifest);
+}
+
 async function loadProgressionCatalog() {
   const [nodes, synergies, styles] = await Promise.all([
     loadJson("./src/data/progression_nodes.json", DEFAULT_PROGRESSION_NODES_FALLBACK),
@@ -2058,7 +3039,14 @@ async function loadProgressionCatalog() {
   progressionSynergies =
     Array.isArray(synergies) && synergies.length ? synergies : [...DEFAULT_PROGRESSION_SYNERGIES_FALLBACK];
   playStyles = Array.isArray(styles) ? styles : [];
-  await loadOnboardingCatalog();
+  await Promise.all([
+    loadOnboardingCatalog(),
+    loadQolCatalog(),
+    loadBalancePhase4Catalog(),
+    loadSoftLaunchCatalog(),
+    loadRetentionCatalog(),
+    loadReleaseCatalog(),
+  ]);
 }
 
 function renderTeamPanel() {
@@ -2081,8 +3069,26 @@ function renderTeamPanel() {
   els.teamPanel.innerHTML = `<div>Нанято: <b>${hired.length}</b> · суммарная ЗП: <b>${money(daily)}</b>/день (списывается в P&amp;L)</div><ul class="incoming" style="margin-top:6px">${rows}</ul>`;
 }
 
-async function initGame() {
+function finalizeSessionTelemetry() {
+  if (!gameState) return;
+  bumpSessionMetrics(gameState);
+  syncVisitMetrics(gameState);
+  if (!gameState.visitMetrics?.startedAt) {
+    gameState.visitMetrics.startedAt = new Date().toISOString();
+  }
+}
+
+let initGameGeneration = 0;
+
+async function initGame(options = {}) {
+  const generation = ++initGameGeneration;
+  await initGameBody(options, generation);
+}
+
+async function initGameBody(options = {}, generation = initGameGeneration) {
+  const skipAutoLoad = options.skipAutoLoad === true;
   await ensurePlatformReady();
+  if (generation !== initGameGeneration) return;
   await loadProgressionCatalog();
   const [categories, rawSkus, rawConst, rawEvents] = await Promise.all([
     loadJson("./src/data/categories.json", defaultCategories),
@@ -2092,9 +3098,30 @@ async function initGame() {
   ]);
 
   economyConstants = normalizeConstants(rawConst);
-  const skus = (Array.isArray(rawSkus) ? rawSkus : defaultSkus).map(normalizeSku);
   eventDefinitions = Array.isArray(rawEvents) ? rawEvents : [];
 
+  if (!skipAutoLoad) {
+    const picked = await loadHybridSave();
+    if (generation !== initGameGeneration) return;
+    if (picked && applyLoadedState(picked.state)) {
+      await syncSavesAfterLoad(picked);
+      if (generation !== initGameGeneration) return;
+      bootstrapUiAfterStateChange();
+      finalizeSessionTelemetry();
+      try {
+        render();
+      } catch (e) {
+        console.error("render after load failed", e);
+        showTutorialShell(1);
+      }
+      console.log(`Auto-loaded save from ${picked.source}, day`, gameState.day);
+      return;
+    }
+  }
+
+  if (generation !== initGameGeneration) return;
+
+  const skus = (Array.isArray(rawSkus) ? rawSkus : defaultSkus).map(normalizeSku);
   const eventState = emptyEventState();
   gameState = {
     day: 1,
@@ -2124,26 +3151,39 @@ async function initGame() {
     phase2LastPreReleaseRun: null,
     phase3Regression: {},
     phase3StyleAudit: null,
+    phase4BalanceLastSim: null,
     progressionPoints: 0,
     progressionUnlocked: emptyProgressionUnlocked(),
     playStyleId: null,
     antiExploit: null,
     onboardingCompletedIds: [],
     onboardingHidden: false,
+    beginnerUiExpanded: false,
+    tutorialCompleted: false,
+    tutorialSkipped: false,
+    skuStockFilter: "all",
+    skuSearchQuery: "",
+    feedbackLog: [],
+    feedbackDraftCategory: "bug",
+    telemetryLog: [],
+    sessionMetrics: { sessionsStarted: 0, firstPlayAt: null, lastPlayAt: null },
+    visitMetrics: defaultVisitMetrics(),
+    retentionCohort: defaultRetentionCohort(),
+    majorBugStatus: {},
     kpi: defaultKpi(),
     ...eventState,
   };
   refreshDerivedModifiers(gameState);
-  resetMerchDom();
-  fillCategoryFilterSelect();
-  fillSkuSelect();
-  if (els.skuSelect.options.length) els.skuSelect.value = gameState.skus[0].id;
-  syncAdUiFromState();
-  syncCostModelUiFromState();
-  syncReturnsUiFromState();
-  renderSdkStatus();
-  buildMerchTableOnce();
-  render();
+  bootstrapUiAfterStateChange();
+  finalizeSessionTelemetry();
+  if (generation !== initGameGeneration) return;
+  autoSaveGame({ silent: true });
+  try {
+    render();
+  } catch (e) {
+    console.error("render after init failed", e);
+    showTutorialShell(1);
+  }
 }
 
 function defaultKpi() {
@@ -2208,12 +3248,46 @@ function applyLoadedState(raw) {
     phase3Regression: raw.phase3Regression && typeof raw.phase3Regression === "object" ? raw.phase3Regression : {},
     phase3StyleAudit:
       raw.phase3StyleAudit && typeof raw.phase3StyleAudit === "object" ? raw.phase3StyleAudit : null,
+    phase4BalanceLastSim:
+      raw.phase4BalanceLastSim && typeof raw.phase4BalanceLastSim === "object" ? raw.phase4BalanceLastSim : null,
     progressionPoints: Math.max(0, Math.round(Number(raw.progressionPoints) || 0)),
     progressionUnlocked: normalizeProgressionUnlocked(raw.progressionUnlocked),
     playStyleId: raw.playStyleId != null ? String(raw.playStyleId) : null,
     antiExploit: null,
     onboardingCompletedIds: Array.isArray(raw.onboardingCompletedIds) ? raw.onboardingCompletedIds : [],
     onboardingHidden: raw.onboardingHidden === true,
+    beginnerUiExpanded: raw.beginnerUiExpanded === true,
+    ...migrateTutorialFlags(raw),
+    skuStockFilter: String(raw.skuStockFilter || "all"),
+    skuSearchQuery: String(raw.skuSearchQuery || ""),
+    feedbackLog: normalizeFeedbackLog(raw.feedbackLog),
+    feedbackDraftCategory: String(raw.feedbackDraftCategory || "bug"),
+    telemetryLog: Array.isArray(raw.telemetryLog) ? raw.telemetryLog : [],
+    sessionMetrics:
+      raw.sessionMetrics && typeof raw.sessionMetrics === "object"
+        ? {
+            sessionsStarted: Math.max(0, Number(raw.sessionMetrics.sessionsStarted) || 0),
+            firstPlayAt: raw.sessionMetrics.firstPlayAt || null,
+            lastPlayAt: raw.sessionMetrics.lastPlayAt || null,
+          }
+        : { sessionsStarted: 0, firstPlayAt: null, lastPlayAt: null },
+    visitMetrics:
+      raw.visitMetrics && typeof raw.visitMetrics === "object"
+        ? {
+            startedAt: raw.visitMetrics.startedAt || null,
+            reachedDay2: raw.visitMetrics.reachedDay2 === true,
+            reachedDay14: raw.visitMetrics.reachedDay14 === true,
+          }
+        : defaultVisitMetrics(),
+    retentionCohort:
+      raw.retentionCohort && typeof raw.retentionCohort === "object"
+        ? {
+            visits: Math.max(0, Number(raw.retentionCohort.visits) || 0),
+            d1ReturnVisits: Math.max(0, Number(raw.retentionCohort.d1ReturnVisits) || 0),
+            day14Completions: Math.max(0, Number(raw.retentionCohort.day14Completions) || 0),
+          }
+        : defaultRetentionCohort(),
+    majorBugStatus: raw.majorBugStatus && typeof raw.majorBugStatus === "object" ? raw.majorBugStatus : {},
     kpi: { ...defaultKpi(), ...(raw.kpi || {}) },
     activeEvents: Array.isArray(raw.activeEvents) ? raw.activeEvents : [],
     eventLog: Array.isArray(raw.eventLog) ? raw.eventLog : [],
@@ -2447,32 +3521,78 @@ function renderFreezeSummary() {
   els.freezeSummary.innerHTML = `<div><b>Решение:</b> <span style="color:${color}"><b>${rep.decision}</b></span> · пройдено <b>${rep.passCount}/${rep.totalChecks}</b></div><ul class="incoming" style="margin-top:6px">${rows}</ul>`;
 }
 
-function saveGame() {
-  const res = saveToLocal(snapshotStateForSave());
-  if (res.ok) alert("Сохранено в браузере (localStorage).");
-  else alert("Не удалось сохранить: " + (res.error || ""));
-}
-
-function loadGame() {
-  const raw = loadFromLocal();
-  if (!raw) {
-    alert("Нет сохранения.");
-    return;
-  }
-  if (!applyLoadedState(raw)) {
-    alert("Файл сохранения повреждён.");
-    return;
-  }
+function bootstrapUiAfterStateChange() {
   resetMerchDom();
   fillCategoryFilterSelect();
   fillSkuSelect();
-  if (els.skuSelect.options.length) els.skuSelect.value = gameState.skus[0].id;
+  if (els.skuSelect?.options.length) els.skuSelect.value = gameState.skus[0]?.id || "";
   syncAdUiFromState();
   syncCostModelUiFromState();
   syncReturnsUiFromState();
+  syncSkuFiltersUiFromState();
   renderSdkStatus();
   buildMerchTableOnce();
+}
+
+/**
+ * @param {{ silent?: boolean; flushCloud?: boolean }} [options]
+ */
+function autoSaveGame(options = {}) {
+  if (!gameState) return { ok: false, error: "no state" };
+  const silent = options.silent !== false;
+  const snapshot = attachSaveMeta(snapshotStateForSave(), "local");
+  const localRes = saveToLocal(snapshot);
+  lastAutoSaveStatus = {
+    ok: localRes.ok,
+    localOk: localRes.ok,
+    cloudOk: true,
+    cloudSkipped: !cloudAdapter || cloudSyncPaused,
+    cloudSource: cloudAdapter?.label || "none",
+    at: new Date().toISOString(),
+    day: gameState.day,
+    error: localRes.error || null,
+    cloudError: null,
+  };
+  if (!localRes.ok && !silent) alert("Не удалось сохранить локально: " + (localRes.error || ""));
+  void persistCloudSave(snapshot, options.flushCloud === true);
+  return localRes;
+}
+
+async function persistCloudSave(snapshot, flush) {
+  if (!cloudAdapter || cloudSyncPaused) return;
+  const cloudRes = await saveCloudSave(cloudAdapter, snapshot, flush);
+  lastAutoSaveStatus.cloudOk = cloudRes.ok !== false;
+  lastAutoSaveStatus.cloudSkipped = !!cloudRes.skipped;
+  lastAutoSaveStatus.cloudError = cloudRes.error || null;
+  lastAutoSaveStatus.ok = lastAutoSaveStatus.localOk && lastAutoSaveStatus.cloudOk;
+  renderSdkStatus();
+}
+
+function saveGame() {
+  const res = autoSaveGame({ silent: false, flushCloud: true });
+  if (res.ok) {
+    alert(
+      cloudAdapter?.label === "yandex"
+        ? "Сохранено локально и в облаке Yandex."
+        : "Сохранено локально и в mock-облаке (dev)."
+    );
+  }
+}
+
+async function loadGame() {
+  const picked = await loadHybridSave();
+  if (!picked) {
+    alert("Нет сохранения.");
+    return;
+  }
+  if (!applyLoadedState(picked.state)) {
+    alert("Файл сохранения повреждён.");
+    return;
+  }
+  await syncSavesAfterLoad(picked);
+  bootstrapUiAfterStateChange();
   render();
+  alert(`Загружено из ${picked.source === "cloud" ? "облака" : "localStorage"} (день ${gameState.day}).`);
 }
 
 function exportGameToJsonFile() {
@@ -2632,15 +3752,8 @@ function importGameFromJsonObject(raw) {
     alert("JSON сохранения повреждён или несовместим.");
     return false;
   }
-  resetMerchDom();
-  fillCategoryFilterSelect();
-  fillSkuSelect();
-  if (els.skuSelect.options.length) els.skuSelect.value = gameState.skus[0].id;
-  syncAdUiFromState();
-  syncCostModelUiFromState();
-  syncReturnsUiFromState();
-  renderSdkStatus();
-  buildMerchTableOnce();
+  bootstrapUiAfterStateChange();
+  autoSaveGame({ silent: true });
   render();
   return true;
 }
@@ -2683,13 +3796,40 @@ function nextDay() {
   pushKpiHistorySnapshot();
   gameState.progressionPoints = (gameState.progressionPoints || 0) + PROGRESSION_POINT_PER_DAY;
   updateServiceCauseHistory();
+  pushDailyTelemetry(gameState);
+  syncVisitMetrics(gameState);
+  autoSaveGame({ silent: true });
   render();
   void tryShowInterstitialAfterDay();
   console.log("Day advanced", gameState);
 }
 
-function resetGame() {
-  initGame();
+async function resetGame() {
+  if (
+    !confirm(
+      "Сбросить игру и удалить автосохранение (локальное и облачное)? Экспортируйте JSON, если нужна резервная копия."
+    )
+  ) {
+    return;
+  }
+  clearLocalSave();
+  initGameGeneration++;
+  showTutorialShell(1, {
+    day: 1,
+    cash: 120000,
+    inStock: {},
+    incomingShipments: [],
+    lastDayReport: null,
+    kpi: defaultKpi(),
+  });
+  try {
+    await clearCloudSave(cloudAdapter);
+    if (gameState) finalizeVisitToCohort(gameState);
+    await initGame({ skipAutoLoad: true });
+  } catch (e) {
+    console.error("resetGame failed", e);
+    alert("Сброс не завершился полностью. Обновите страницу или попробуйте ещё раз.");
+  }
 }
 
 function totalStock() {
@@ -2726,11 +3866,36 @@ function useRescue() {
 }
 
 function render() {
+  if (!gameState) return;
+  syncTutorialCompletion(gameState);
+  const onboardingView = resolveOnboarding(gameState, onboardingSteps);
+  const beginnerTier = resolveBeginnerTier(gameState, onboardingView);
+  const isDevUi = typeof document !== "undefined" && document.body.dataset.uiMode === "dev";
+  const tutorialStep = resolveTutorialStep(gameState);
+  const tutorialOn = isTutorialActive(gameState) && !isDevUi && tutorialStep > 0;
+
+  if (tutorialOn) {
+    const content = getTutorialContent(tutorialStep, gameState);
+    applyTutorialUi(tutorialStep, tutorialVisibleSections(tutorialStep), !!content?.highlightNextDay);
+  } else {
+    applyBeginnerUi(beginnerTier, isDevUi);
+    renderBeginnerTeaser(beginnerTier);
+  }
+
   const salesLine = gameState.lastDayReport
     ? `Итог последнего Next Day: выручка <b>${Math.round(gameState.kpi.revenue).toLocaleString("ru-RU")}</b> · прибыль <b>${Math.round(gameState.kpi.profit).toLocaleString("ru-RU")}</b> · маржа <b>${gameState.kpi.marginPct.toFixed(1)}%</b> · ACOS <b>${(gameState.kpi.acos * 100).toFixed(1)}%</b> · возвраты <b>${(gameState.kpi.returnPct * 100).toFixed(1)}%</b> · stockout <b>${gameState.kpi.unmetUnits}</b> шт. (${(gameState.kpi.stockoutRate * 100).toFixed(1)}% от «желаемых» заказов) · запас ~<b>${gameState.kpi.daysOfStock.toFixed(1)}</b> дн. (оценка по чистым продажам)`
     : `Итог дня: <span style="color:#a9acb7">симуляция ещё не запускалась — нажми Next Day</span>`;
 
-  els.summary.innerHTML = [
+  els.summary.innerHTML =
+    tutorialOn || (beginnerTier < 3 && !isDevUi)
+      ? [
+          `День <b>${gameState.day}</b> · На счёте: <b>${gameState.cash.toLocaleString("ru-RU")} ₽</b>`,
+          `На складе: <b>${totalStock()}</b> шт.${gameState.incomingShipments.length ? ` · В пути: <b>${gameState.incomingShipments.length}</b>` : ""}`,
+          gameState.lastDayReport
+            ? `Прибыль за последний день: <b>${Math.round(gameState.kpi.profit).toLocaleString("ru-RU")} ₽</b>`
+            : `<span class="muted">Продаж ещё не было — закупите товар и нажмите «Следующий день».</span>`,
+        ].join("<br/>")
+      : [
     `День: <b>${gameState.day}</b>`,
     `Кэш: <b>${gameState.cash.toLocaleString("ru-RU")}</b>`,
     `Реклама: <b>${gameState.adEnabled === false ? "выкл" : "вкл"}</b> · бюджет <b>${gameState.adBudget.toLocaleString("ru-RU")}</b>/день · в модели <b>${getEffectiveAdBudget().toLocaleString("ru-RU")}</b>`,
@@ -2741,6 +3906,9 @@ function render() {
     `Прогрессия: очки <b>${gameState.progressionPoints || 0}</b> · узлов <b>${progressionNodes.filter((n) => gameState.progressionUnlocked?.[n.id]).length}/${progressionNodes.length}</b> · ЗП команды <b>${money(gameState.teamDailyCost || 0)}</b>/день`,
     `Стиль игры: <b>${gameState.playStyleId ? playStyleById(gameState.playStyleId)?.name || gameState.playStyleId : "не выбран"}</b> · антиэксплойт: <b>${gameState.antiExploit?.status || "—"}</b>`,
     `Анти-тупик: использовано авансов <b>${gameState.rescuesUsed || 0}</b>/<b>${MAX_RESCUES_PER_RUN}</b>`,
+    lastAutoSaveStatus.ok
+      ? `Автосохранение: <b>день ${lastAutoSaveStatus.day ?? gameState.day}</b>${lastAutoSaveStatus.at ? ` · ${new Date(lastAutoSaveStatus.at).toLocaleTimeString("ru-RU")}` : ""} · local <b>${lastAutoSaveStatus.localOk ? "OK" : "ERR"}</b> · cloud <b>${lastAutoSaveStatus.cloudSource}</b> <b>${lastAutoSaveStatus.cloudSkipped ? "—" : lastAutoSaveStatus.cloudOk ? "OK" : "ERR"}</b>`
+      : `<span style="color:#ff8f8f">Автосохранение: ошибка</span>`,
     salesLine,
   ].join("<br/>");
   if (els.serviceRating) {
@@ -2784,13 +3952,26 @@ function render() {
   syncAdUiFromState();
   syncCostModelUiFromState();
   syncReturnsUiFromState();
+  syncSkuFiltersUiFromState();
   buildMerchTableOnce();
   renderIncoming();
   renderMorningArrivals();
   renderStockTable();
   renderYesterday();
   renderDeadlockGuard();
+  renderKpiCharts();
   renderKpiDashboard();
+  renderKpiAlertsPanel();
+  renderQolPresetsPanel();
+  renderPhase4BalancePanel();
+  renderSoftLaunchPanel();
+  renderTelemetryPanel();
+  renderTriagePanel();
+  renderMajorBugsPanel();
+  renderPhase4CloseoutPanel();
+  renderBrowserCompatPanel();
+  renderReleaseBuildPanel();
+  renderStoreListingPanel();
   renderCategoryKpiTable();
   renderPlaytestChecklist();
   renderFreezeSummary();
@@ -2888,9 +4069,64 @@ els.runRegression7Btn?.addEventListener("click", () => {
   runRegression7Days();
 });
 els.hideOnboardingBtn?.addEventListener("click", hideOnboarding);
+els.showAllSectionsBtn?.addEventListener("click", expandAllPlayerSections);
+els.skipTutorialBtn?.addEventListener("click", skipTutorial);
+els.quickStartBtn?.addEventListener("click", quickStartBuy);
+els.buyBtn?.addEventListener("click", purchase);
+els.onboardingPanel?.addEventListener("click", (e) => {
+  const btn = e.target instanceof HTMLElement ? e.target.closest(".js-beginner-cta") : null;
+  if (!(btn instanceof HTMLElement)) return;
+  if (btn.dataset.cta === "quickStart") quickStartBuy();
+  if (btn.dataset.cta === "nextDay") nextDay();
+  if (btn.dataset.cta === "finishTutorial") finishTutorial();
+});
 els.runRegression14Btn?.addEventListener("click", () => runRegressionDays(14));
 els.runRegression28Btn?.addEventListener("click", () => runRegressionDays(28));
 els.runStyleBalanceBtn?.addEventListener("click", runPlayStyleBalanceAudit);
+els.runBalanceSim14Btn?.addEventListener("click", runBalanceSim14Days);
+els.exportPhase4BalanceBtn?.addEventListener("click", exportPhase4BalanceReportFile);
+els.submitFeedbackBtn?.addEventListener("click", submitFeedbackEntry);
+els.supportChannelsPanel?.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  const btn = t.closest(".js-support-channel");
+  if (!(btn instanceof HTMLElement)) return;
+  void activateSupportChannel(btn.dataset.supportKind, btn.dataset.supportValue);
+});
+els.exportSoftLaunchBtn?.addEventListener("click", exportSoftLaunchPackageFile);
+els.exportFeedbackBtn?.addEventListener("click", exportFeedbackTriageFile);
+els.exportAnalyticsBtn?.addEventListener("click", exportSoftLaunchAnalyticsFile);
+els.importFeedbackBtn?.addEventListener("click", () => els.importFeedbackInput?.click());
+els.importFeedbackInput?.addEventListener("change", () => {
+  if (!(els.importFeedbackInput instanceof HTMLInputElement)) return;
+  const file = els.importFeedbackInput.files && els.importFeedbackInput.files[0];
+  importFeedbackTriageFile(file || null);
+  els.importFeedbackInput.value = "";
+});
+els.triagePanel?.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  const btn = t.closest(".js-triage-status");
+  if (!(btn instanceof HTMLElement)) return;
+  const entryId = btn.dataset.entryId;
+  const status = btn.dataset.triageStatus;
+  if (entryId && status) updateFeedbackTriage(entryId, status);
+});
+els.majorBugsPanel?.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  const btn = t.closest(".js-major-bug-fix");
+  if (!(btn instanceof HTMLElement)) return;
+  const bugId = btn.dataset.bugId;
+  if (bugId) setMajorBugStatus(bugId, "fixed");
+});
+els.exportPhase4CloseoutBtn?.addEventListener("click", exportPhase4CloseoutFile);
+els.exportReleaseReadinessBtn?.addEventListener("click", exportReleaseReadinessFile);
+els.exportStoreListingBtn?.addEventListener("click", exportStoreListingFile);
+els.feedbackCategorySelect?.addEventListener("change", () => {
+  if (!gameState || !(els.feedbackCategorySelect instanceof HTMLSelectElement)) return;
+  gameState.feedbackDraftCategory = els.feedbackCategorySelect.value;
+});
 els.exportPhase3FreezeBtn?.addEventListener("click", exportPhase3FreezeReportFile);
 els.runPreReleaseBtn?.addEventListener("click", () => {
   runPreReleaseOneClick();
@@ -2985,6 +4221,26 @@ els.categoryFilterSelect?.addEventListener("change", () => {
   if (els.skuSelect.options.length) els.skuSelect.value = els.skuSelect.options[0].value;
   render();
 });
+const onSkuFilterChange = () => {
+  if (!gameState) return;
+  applySkuFiltersFromUi();
+  resetMerchDom();
+  fillSkuSelect();
+  if (els.skuSelect.options.length) els.skuSelect.value = els.skuSelect.options[0].value;
+  renderStockTable();
+  buildMerchTableOnce();
+  updateBuyHint();
+};
+els.skuStockFilterSelect?.addEventListener("change", onSkuFilterChange);
+els.skuSearchInput?.addEventListener("input", onSkuFilterChange);
+els.qolPresetsPanel?.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  const btn = t.closest(".js-qol-preset");
+  if (!(btn instanceof HTMLElement)) return;
+  const presetId = btn.dataset.presetId;
+  if (presetId) applyQolPreset(presetId);
+});
 els.skuSelect.addEventListener("change", updateBuyHint);
 els.qtyInput.addEventListener("input", updateBuyHint);
 
@@ -3023,6 +4279,51 @@ function exposeDevApi() {
     getPhase3Freeze: () => buildPhase3FreezeReport(),
     getOnboarding: () => resolveOnboarding(gameState, onboardingSteps),
     getErrorHints: () => getErrorHints(gameState),
+    getAutoSaveStatus: () => ({ ...lastAutoSaveStatus }),
+    getSaveStatus: () => ({
+      local: !!loadFromLocal(),
+      cloudMock: hasCloudMockSave(),
+      cloudSource: cloudAdapter?.label || "none",
+      lastAutoSave: { ...lastAutoSaveStatus },
+    }),
+    clearSave: () => {
+      clearLocalSave();
+      void clearCloudSave(cloudAdapter);
+    },
+    getKpiAlerts: () => getKpiAlerts(gameState),
+    applyQolPreset: (id) => applyQolPreset(String(id)),
+    runBalanceSim14: () => runBalanceSim14Days(),
+    getPhase4Balance: () => getPhase4BalanceReport(),
+    getSoftLaunchPackage: () => getSoftLaunchPackage(),
+    getFeedbackTriage: () => getFeedbackTriageReport(),
+    getSoftLaunchAnalytics: () => getSoftLaunchAnalytics(),
+    getPhase4Closeout: () => getPhase4CloseoutReport(),
+    getReleaseReadiness: () => getReleaseReadinessReport(),
+    getBrowserCompat: () => browserCompatResult || runBrowserCompatChecks(browserCompatConfig),
+    getBuildManifest: () => ({ ...buildManifest }),
+    getStoreListing: () => getStoreListingPackage(),
+    getUiMode: () => (typeof document !== "undefined" ? document.body.dataset.uiMode || "player" : "player"),
+    getBeginnerTier: () => resolveBeginnerTier(gameState, resolveOnboarding(gameState, onboardingSteps)),
+    getTutorialStep: () => resolveTutorialStep(gameState),
+    isTutorialActive: () => isTutorialActive(gameState),
+    setMajorBugStatus: (bugId, status) => setMajorBugStatus(bugId, status),
+    setFeedbackTriage: (entryId, status) => {
+      updateFeedbackTriage(String(entryId), String(status));
+      return true;
+    },
+    submitFeedback: (categoryId, text) => {
+      const entry = normalizeFeedbackEntry(
+        createFeedbackEntry(gameState, categoryId, text, {
+          priority: inferFeedbackPriority(categoryId),
+        })
+      );
+      if (!entry) return null;
+      if (!Array.isArray(gameState.feedbackLog)) gameState.feedbackLog = [];
+      gameState.feedbackLog.push(entry);
+      autoSaveGame({ silent: true });
+      render();
+      return entry;
+    },
     /** Консольные хелперы для QA (DAILY_TEST_CASES). */
     _test: {
       stock(qty = 500) {
@@ -3086,23 +4387,252 @@ function exposeDevApi() {
       },
       runOnboardingSmoke() {
         const s = mssim.getState();
-        mssim._test.assert("D66 steps loaded", onboardingSteps.length >= 5);
+        mssim._test.assert("D66 steps loaded", onboardingSteps.length >= 3);
         let ob = mssim.getOnboarding();
         mssim._test.assert("D66 starts incomplete", !ob.allDone);
-        mssim._test.stock(200);
+        mssim._test.quickStart();
         ob = mssim.getOnboarding();
         mssim._test.assert("D66 buy step", ob.completed.includes("ob_buy"));
         mssim.nextDay();
         ob = mssim.getOnboarding();
         mssim._test.assert("D67 first day", ob.completed.includes("ob_first_day"));
-        mssim._test.assert("D67 kpi step", ob.completed.includes("ob_kpi"));
+        mssim.nextDay();
+        ob = mssim.getOnboarding();
+        mssim._test.assert("D67 day 2 step", ob.completed.includes("ob_review"));
         const hints = mssim.getErrorHints();
         mssim._test.assert("D68 hints array", Array.isArray(hints));
-        mssim.applyPlayStyle("operator");
-        ob = mssim.getOnboarding();
-        mssim._test.assert("D68 style step", ob.completed.includes("ob_style"));
-        console.log({ onboarding: ob, hints });
+        console.log({ onboarding: ob, hints, tier: mssim.getBeginnerTier() });
         return ob;
+      },
+      quickStart() {
+        quickStartBuy();
+      },
+      runAutosaveSmoke() {
+        mssim._test.stock(100);
+        const expectedDay = mssim.getState().day + 1;
+        mssim.nextDay();
+        mssim._test.assert("D70 autosave key", !!localStorage.getItem(STORAGE_KEY));
+        mssim._test.assert("D70 autosave ok", mssim.getAutoSaveStatus().localOk !== false);
+        mssim._test.assert("D70 day advanced", mssim.getState().day === expectedDay);
+        try {
+          sessionStorage.setItem("mssim_test_expected_day", String(expectedDay));
+        } catch (_) {
+          /* ignore */
+        }
+        console.log("Автозагрузка: нажми F5, затем mssim._test.checkAutoload()");
+        return { expectedDay, status: mssim.getAutoSaveStatus() };
+      },
+      async runCloudSaveSmoke() {
+        mssim._test.stock(120);
+        const beforeDay = mssim.getState().day;
+        mssim.nextDay();
+        await saveCloudSave(cloudAdapter, attachSaveMeta(snapshotStateForSave(), "cloud"), true);
+        const afterDay = mssim.getState().day;
+        const status = mssim.getAutoSaveStatus();
+        mssim._test.assert("D77 day advanced", afterDay === beforeDay + 1);
+        mssim._test.assert("D77 local save", !!localStorage.getItem(STORAGE_KEY));
+        mssim._test.assert("D77 cloud adapter", status.cloudSource === "mock" || status.cloudSource === "yandex");
+        mssim._test.assert("D77 cloud mock key", !!localStorage.getItem(CLOUD_MOCK_KEY) || status.cloudSource === "yandex");
+
+        const cloudAhead = attachSaveMeta(
+          { ...mssim.getState(), day: afterDay + 5, cash: 250000 },
+          "cloud"
+        );
+        localStorage.setItem(CLOUD_MOCK_KEY, JSON.stringify(cloudAhead));
+        clearLocalSave();
+
+        const picked = resolveBestSave(loadFromLocal(), JSON.parse(localStorage.getItem(CLOUD_MOCK_KEY)));
+        mssim._test.assert("D78 picks cloud", picked?.source === "cloud");
+        mssim._test.assert("D78 cloud day ahead", Number(picked?.state?.day) > beforeDay);
+
+        if (picked && applyLoadedState(picked.state)) {
+          saveToLocal(attachSaveMeta(picked.state, "cloud"));
+          render();
+        }
+        mssim._test.assert("D78 applied cloud", mssim.getState().day === afterDay + 5);
+
+        try {
+          sessionStorage.setItem("mssim_test_expected_day", String(afterDay + 5));
+          sessionStorage.setItem("mssim_test_cloud_smoke", "1");
+        } catch (_) {
+          /* ignore */
+        }
+        console.log("Облако: F5 → mssim._test.checkCloudAutoload()");
+        return { status, picked, day: mssim.getState().day };
+      },
+      checkCloudAutoload() {
+        let expected = NaN;
+        try {
+          expected = Number(sessionStorage.getItem("mssim_test_expected_day"));
+        } catch (_) {
+          /* ignore */
+        }
+        const day = mssim.getState().day;
+        mssim._test.assert("D79 cloud autoload day", day === expected);
+        const saveStatus = mssim.getSaveStatus();
+        mssim._test.assert("D79 local restored", saveStatus.local);
+        console.log({ day, expected, saveStatus });
+        return { day, expected, saveStatus };
+      },
+      checkAutoload() {
+        let expected = NaN;
+        try {
+          expected = Number(sessionStorage.getItem("mssim_test_expected_day"));
+        } catch (_) {
+          /* ignore */
+        }
+        const day = mssim.getState().day;
+        if (!Number.isFinite(expected)) {
+          mssim._test.assert("D70 autoload (укажи день)", false);
+          console.log("Сначала: mssim._test.runAutosaveSmoke(), потом F5");
+          return { day, expected: null };
+        }
+        mssim._test.assert("D70 autoload day", day === expected);
+        console.log({ day, expected, autoSave: mssim.getAutoSaveStatus() });
+        return { day, expected };
+      },
+      runQolSmoke() {
+        mssim._test.assert("D71 presets", qolPresets.length >= 4);
+        gameState.skuStockFilter = "out_of_stock";
+        const out = getVisibleSkus();
+        mssim._test.assert("D71 filter out", out.every((s) => (gameState.inStock[s.id] || 0) <= 0));
+        gameState.skuSearchQuery = "lip";
+        gameState.skuStockFilter = "all";
+        const searched = getVisibleSkus();
+        mssim._test.assert("D71 search", searched.some((s) => String(s.id).includes("lip")));
+        gameState.skuSearchQuery = "";
+        syncSkuFiltersUiFromState();
+        mssim._test.stock(50);
+        mssim.nextDay();
+        const alerts = mssim.getKpiAlerts();
+        mssim._test.assert("D72 alerts array", Array.isArray(alerts));
+        mssim.applyQolPreset("qol_operator");
+        mssim._test.assert("D73 style preset", mssim.getState().playStyleId === "operator");
+        render();
+        console.log({ alerts, visible: getVisibleSkus().length });
+        return { alerts, presets: qolPresets.length };
+      },
+      runBalanceSmoke() {
+        const ret = auditReturnsLeverage(gameState, balancePhase4);
+        mssim._test.assert("D74 returns leverage", ret.pass);
+        mssim._test.assert("D74 reduction >= 30%", ret.reductionPct >= 30);
+        const sim = mssim.runBalanceSim14();
+        mssim._test.assert("D75 sim events", sim.eventsAudit.total >= 0);
+        const rep = mssim.getPhase4Balance();
+        mssim._test.assert("D76 balance report", rep.checks.length >= 5);
+        mssim._test.assert("D76 returns leverage check", rep.checks.some((c) => c.id === "returns-leverage" && c.pass));
+        console.log({ ret, sim, rep });
+        return rep;
+      },
+      runSoftLaunchSmoke() {
+        const pkg = mssim.getSoftLaunchPackage();
+        mssim._test.assert("D80 soft launch package", pkg?.packageVersion === 1);
+        mssim._test.assert("D80 readiness checks", (pkg.readiness?.checks || []).length >= 10);
+        mssim._test.assert("D80 support channels", (softLaunchConfig.support?.channels || []).length >= 1);
+        const entry = mssim.submitFeedback("bug", "Smoke test feedback D81");
+        mssim._test.assert("D81 feedback entry", !!entry?.id);
+        const triage = mssim.getFeedbackTriage();
+        mssim._test.assert("D82 triage total", triage.summary.total >= 1);
+        mssim._test.assert("D82 triage bug", (triage.summary.byCategory.bug || 0) >= 1);
+        console.log({ pkg, triage });
+        return { pkg, triage };
+      },
+      runTriageSmoke() {
+        mssim.submitFeedback("bug", "Triage smoke D83");
+        const entry = gameState.feedbackLog[gameState.feedbackLog.length - 1];
+        mssim._test.assert("D83 triage open", entry?.triageStatus === "open");
+        mssim._test.assert("D83 priority high", entry?.priority === "high");
+        mssim.setFeedbackTriage(entry.id, "investigating");
+        mssim._test.assert("D84 investigating", entry.triageStatus === "investigating");
+        mssim.nextDay();
+        const analytics = mssim.getSoftLaunchAnalytics();
+        mssim._test.assert("D85 telemetry points", (analytics.telemetryLog || []).length >= 1);
+        mssim._test.assert("D85 retention", typeof analytics.retention?.proxyD1Return === "boolean");
+        mssim._test.assert("D86 triage summary", analytics.triage.total >= 1);
+        console.log({ analytics, entry });
+        return analytics;
+      },
+      runRetentionCloseoutSmoke() {
+        const audit = auditMajorBugs(majorBugsCatalog, gameState.majorBugStatus, gameState.feedbackLog);
+        mssim._test.assert("D87 major registry", audit.registry.length >= 3);
+        mssim._test.assert("D87 open major cap", audit.openMajorTotal <= retentionGates.maxOpenMajorBugs);
+        const rep = mssim.getPhase4Closeout();
+        mssim._test.assert("D88 closeout report", rep.block === "79-80");
+        mssim._test.assert("D88 checks", rep.retentionGates.checks.length >= 5);
+        mssim._test.assert("D89 decision set", !!rep.decision);
+        syncVisitMetrics(gameState);
+        mssim._test.assert("D89 visit sync", gameState.visitMetrics.reachedDay2 === (gameState.day >= 2));
+        console.log({ audit, rep });
+        return rep;
+      },
+      runBuildCompatSmoke() {
+        const compat = mssim.getBrowserCompat();
+        mssim._test.assert("D90 browser supported", compat.supported);
+        mssim._test.assert("D90 localStorage", compat.checks.find((c) => c.id === "localStorage")?.pass);
+        mssim._test.assert("D90 fetch", compat.checks.find((c) => c.id === "fetch")?.pass);
+        const readiness = mssim.getReleaseReadiness();
+        mssim._test.assert("D91 readiness report", readiness.block === "81-82");
+        mssim._test.assert("D91 compat check", readiness.checks.some((c) => c.id === "compat-required"));
+        mssim._test.assert("D92 manifest object", typeof mssim.getBuildManifest().version === "string");
+        console.log({ compat, readiness, manifest: mssim.getBuildManifest() });
+        return readiness;
+      },
+      runStoreListingSmoke() {
+        const pkg = mssim.getStoreListing();
+        mssim._test.assert("D93 listing block", pkg.block === "83-84");
+        mssim._test.assert("D93 title filled", pkg.listing.title.length >= 3);
+        mssim._test.assert("D94 validation checks", pkg.validation.checks.length >= 8);
+        mssim._test.assert("D94 screenshots", pkg.listing.assets.screenshots.length >= 3);
+        mssim._test.assert("D95 copyPaste", !!pkg.copyPaste.shortDescription && !!pkg.copyPaste.keywords);
+        mssim._test.assert("D95 decision ready", pkg.decision === "READY" || pkg.decision === "READY WITH RISKS");
+        console.log({ pkg });
+        return pkg;
+      },
+      runKpiChartsSmoke() {
+        mssim._test.stock(200);
+        mssim._test.days(3);
+        mssim._test.assert("D100 charts row", !!document.getElementById("kpiChartsRow"));
+        const panels = document.querySelectorAll(".kpi-chart-panel");
+        mssim._test.assert("D100 three panels", panels.length >= 3);
+        mssim._test.assert("D100 history orders", (mssim.getState().kpiHistory?.[0]?.ordersWanted ?? 0) >= 0);
+        console.log({ hist: mssim.getState().kpiHistory?.slice(-3) });
+        return panels.length;
+      },
+      runTutorialSmoke() {
+        mssim._test.assert("D99 tutorial active", mssim.isTutorialActive());
+        mssim._test.assert("D99 step 1", mssim.getTutorialStep() === 1);
+        const visible = [...document.querySelectorAll("[data-ui-section]")].filter(
+          (el) => getComputedStyle(el).display !== "none" && !el.hidden
+        );
+        mssim._test.assert("D99 few sections", visible.length <= 3);
+        mssim._test.quickStart();
+        mssim._test.assert("D99 step 2", mssim.getTutorialStep() === 2);
+        mssim.nextDay();
+        mssim._test.assert("D99 step 3", mssim.getTutorialStep() === 3);
+        finishTutorial();
+        mssim._test.assert("D99 completed", !mssim.isTutorialActive());
+        console.log({ step: mssim.getTutorialStep() });
+        return mssim.getState().tutorialCompleted;
+      },
+      runPlayerUiSmoke() {
+        const mode = mssim.getUiMode();
+        mssim._test.assert("D96 player mode", mode === "player");
+        mssim._test.assert("D96 beginner tier 1 start", mssim.getBeginnerTier() === 1);
+        const devEls = [...document.querySelectorAll("[data-dev-only]")];
+        const hidden = devEls.filter((el) => {
+          const st = getComputedStyle(el);
+          return st.display === "none" || el.hidden;
+        });
+        mssim._test.assert("D96 dev panels hidden", hidden.length >= 12);
+        mssim._test.assert("D97 next day btn", !!document.getElementById("nextDayBtn"));
+        mssim._test.assert("D97 quick start visible", !!document.getElementById("quickStartBtn"));
+        const dumpCard = document.getElementById("stateDump")?.closest("[data-dev-only]");
+        mssim._test.assert(
+          "D97 state debug hidden",
+          !dumpCard || getComputedStyle(dumpCard).display === "none"
+        );
+        console.log({ mode, tier: mssim.getBeginnerTier(), devTotal: devEls.length, devHidden: hidden.length });
+        return { mode, tier: mssim.getBeginnerTier(), devTotal: devEls.length, devHidden: hidden.length };
       },
     },
   };

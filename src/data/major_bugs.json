@@ -1,0 +1,25 @@
+{
+  "bugs": [
+    {
+      "id": "MB-001",
+      "title": "feeRateEffective TDZ в daySim",
+      "severity": "major",
+      "status": "fixed",
+      "note": "Исправлено в блоке 65–69"
+    },
+    {
+      "id": "MB-002",
+      "title": "mssim._test undefined после F5",
+      "severity": "major",
+      "status": "fixed",
+      "note": "exposeDevApi встроен в init"
+    },
+    {
+      "id": "MB-003",
+      "title": "autosave checkAutoload dayBefore",
+      "severity": "major",
+      "status": "fixed",
+      "note": "sessionStorage expected day"
+    }
+  ]
+}

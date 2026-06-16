@@ -1,7 +1,30 @@
 /** @typedef {{ id: string; name: string; type: string; durationDays: number; weight?: number; scope?: string; effect?: Record<string, unknown> }} EventDef */
 
-export const EVENT_DAILY_CHANCE = 0.18;
-export const EVENT_PITY_DAYS = 6;
+export let EVENT_DAILY_CHANCE = 0.18;
+export let EVENT_PITY_DAYS = 6;
+
+let eventBalanceOpts = {
+  maxActiveNegative: 2,
+  maxReturnRateModMult: 1.1,
+};
+
+/**
+ * @param {{ maxActiveNegative?: number; maxReturnRateModMult?: number; dailyChance?: number; pityDays?: number }} opts
+ */
+export function configureEventBalance(opts = {}) {
+  if (opts.maxActiveNegative != null) {
+    eventBalanceOpts.maxActiveNegative = Math.max(1, Number(opts.maxActiveNegative) || 2);
+  }
+  if (opts.maxReturnRateModMult != null) {
+    eventBalanceOpts.maxReturnRateModMult = Math.max(1, Number(opts.maxReturnRateModMult) || 1.1);
+  }
+  if (opts.dailyChance != null) {
+    EVENT_DAILY_CHANCE = Math.max(0, Math.min(1, Number(opts.dailyChance) || 0.18));
+  }
+  if (opts.pityDays != null) {
+    EVENT_PITY_DAYS = Math.max(1, Math.round(Number(opts.pityDays) || 6));
+  }
+}
 
 /**
  * @returns {object}
@@ -58,7 +81,15 @@ export function processDailyEvents(state, eventDefs, rng = Math.random) {
   const shouldForce = state.daysSinceLastEvent >= EVENT_PITY_DAYS;
   const shouldRoll = shouldForce || rng() < EVENT_DAILY_CHANCE;
   if (shouldRoll) {
-    const picked = pickEvent(state, eventDefs, rng);
+    let picked = pickEvent(state, eventDefs, rng);
+    if (picked?.type === "negative") {
+      const negActive = (state.activeEvents || []).filter((e) => e.type === "negative").length;
+      const cap = eventBalanceOpts.maxActiveNegative || 2;
+      if (negActive >= cap && !shouldForce) {
+        const positives = eventDefs.filter((d) => d.type === "positive");
+        picked = positives.length ? pickEventWeighted(positives, rng) : null;
+      }
+    }
     if (picked) applyEvent(state, picked, rng);
   }
 
@@ -151,6 +182,17 @@ function delayIncomingShipments(state, categoryId, extraDays) {
   }
 }
 
+function pickEventWeighted(pool, rng) {
+  if (!pool.length) return null;
+  const totalWeight = pool.reduce((acc, e) => acc + (Number(e.weight) || 1), 0);
+  let roll = rng() * totalWeight;
+  for (const def of pool) {
+    roll -= Number(def.weight) || 1;
+    if (roll <= 0) return def;
+  }
+  return pool[pool.length - 1];
+}
+
 /**
  * @param {object} state
  * @param {import("./eventEngine.js").EventDef[]} eventDefs
@@ -165,13 +207,7 @@ function pickEvent(state, eventDefs, rng) {
   if (!pool.length) pool = [...eventDefs];
   if (!pool.length) return null;
 
-  const totalWeight = pool.reduce((acc, e) => acc + (Number(e.weight) || 1), 0);
-  let roll = rng() * totalWeight;
-  for (const def of pool) {
-    roll -= Number(def.weight) || 1;
-    if (roll <= 0) return def;
-  }
-  return pool[pool.length - 1];
+  return pickEventWeighted(pool, rng);
 }
 
 function pickRandomCategory(state, rng) {
@@ -246,6 +282,9 @@ export function computeEventModifiers(state, eventDefs) {
         prev + (Number(effect.leadTimeExtraByCategory) || 0);
     }
   }
+
+  const cap = eventBalanceOpts.maxReturnRateModMult || 1.1;
+  if (mods.returnRateModMult > cap) mods.returnRateModMult = cap;
 
   return mods;
 }

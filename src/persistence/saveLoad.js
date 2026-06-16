@@ -1,5 +1,7 @@
 const STORAGE_KEY = "marketplace_seller_sim_v1";
 
+export { STORAGE_KEY };
+
 /**
  * @param {object} state
  */

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="470" viewBox="0 0 800 470">
+  <rect width="800" height="470" fill="#121318"/>
+  <rect x="40" y="60" width="720" height="280" rx="16" fill="#1b1d25" stroke="#2b2e3a"/>
+  <text x="400" y="180" text-anchor="middle" fill="#7a4cff" font-family="Arial,sans-serif" font-size="48" font-weight="700">Marketplace Seller Simulator</text>
+  <text x="400" y="240" text-anchor="middle" fill="#e7e7ea" font-family="Arial,sans-serif" font-size="24">Закупки · Реклама · KPI · Рост</text>
+  <text x="400" y="400" text-anchor="middle" fill="#a9acb7" font-family="Arial,sans-serif" font-size="16">Cover placeholder 800×470 — заменить перед публикацией</text>
+</svg>

@@ -3,20 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Marketplace Seller Simulator - Phase 2</title>
+    <title>Симулятор продавца маркетплейса</title>
+    <meta name="description" content="Экономический симулятор продавца на маркетплейсе — Яндекс Игры" />
     <style>
       :root { color-scheme: dark; }
-      body { font-family: Arial, sans-serif; margin: 20px; background: #121318; color: #e7e7ea; }
-      h1 { margin: 0 0 12px; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 16px;
+        background: #121318;
+        color: #e7e7ea;
+      }
+      .app-shell { max-width: 1080px; margin: 0 auto; }
+      h1 { margin: 0 0 4px; font-size: 1.5rem; }
+      .app-tagline { margin: 0 0 12px; }
       .row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-      button { background: #7a4cff; border: 0; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+      button {
+        background: #7a4cff;
+        border: 0;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      button.btn-primary { padding: 10px 18px; font-size: 15px; font-weight: 700; }
       button.btn-secondary { background: #3a3f52; }
       button:hover { opacity: 0.95; }
       button:disabled { opacity: 0.45; cursor: not-allowed; }
-      .card { background: #1b1d25; border: 1px solid #2b2e3a; border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+      .card {
+        background: #1b1d25;
+        border: 1px solid #2b2e3a;
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .card-title { display: block; margin-bottom: 8px; font-size: 15px; }
       pre { white-space: pre-wrap; word-break: break-word; }
       .muted { color: #a9acb7; font-size: 13px; }
-      select, input[type="number"] { background: #252836; border: 1px solid #2b2e3a; color: #e7e7ea; padding: 6px 8px; border-radius: 6px; min-width: 120px; }
+      select, input[type="number"], input[type="search"] {
+        background: #252836;
+        border: 1px solid #2b2e3a;
+        color: #e7e7ea;
+        padding: 6px 8px;
+        border-radius: 6px;
+        min-width: 120px;
+      }
       label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #a9acb7; }
       ul.incoming { margin: 8px 0 0; padding-left: 20px; }
       ul.incoming li { margin-bottom: 4px; }
@@ -26,275 +59,482 @@
       table.stock td.num { text-align: right; font-variant-numeric: tabular-nums; }
       .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 8px; }
       .kpi-card { border: 1px solid #2b2e3a; border-radius: 8px; background: #181b23; padding: 10px; }
-      .kpi-title { color: #a9acb7; font-size: 12px; margin-bottom: 6px; display:flex; align-items:center; gap:6px; }
-      .kpi-help { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:999px; border:1px solid #3a3f52; color:#c9d2ff; font-size:11px; cursor:help; }
+      .kpi-title { color: #a9acb7; font-size: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+      .kpi-help {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 16px; height: 16px; border-radius: 999px;
+        border: 1px solid #3a3f52; color: #c9d2ff; font-size: 11px; cursor: help;
+      }
       .kpi-value { font-size: 18px; font-weight: 700; }
       .kpi-good { color: #8fd694; }
       .kpi-warn { color: #ffcc66; }
       .kpi-bad { color: #ff8f8f; }
+      .kpi-charts-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .kpi-chart-panel {
+        border: 1px solid #2b3a35;
+        border-radius: 10px;
+        background: linear-gradient(160deg, #141a18 0%, #181b23 55%);
+        padding: 10px 12px;
+        box-shadow: inset 0 0 24px rgba(143, 214, 148, 0.04);
+      }
+      .kpi-chart-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+      .kpi-chart-icon {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        border: 1px solid #3a5248;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #8fd694;
+      }
+      .kpi-chart-label { flex: 1; color: #e7e7ea; font-weight: 600; }
+      .kpi-chart-pct { font-weight: 700; font-size: 14px; }
+      .kpi-chart-svg { width: 100%; height: 56px; display: block; }
+      .kpi-chart-donut-wrap { display: flex; justify-content: center; padding: 4px 0; }
+      .kpi-chart-donut { width: 56px; height: 56px; }
+      .kpi-chart-caption { margin-top: 6px; font-size: 11px; }
+      .kpi-chart-empty { height: 56px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+      .dev-hint {
+        margin: 0;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: #2a2040;
+        border: 1px solid #7a4cff;
+        font-size: 12px;
+      }
+      body[data-ui-mode="player"] [data-dev-only] { display: none !important; }
+      .app-header { margin-bottom: 12px; }
+      .player-toolbar { margin-bottom: 0; }
+      .beginner-hero {
+        border: 1px solid #5a3fbf;
+        border-radius: 10px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #221838 0%, #1b1d25 55%);
+      }
+      .beginner-hero h2 { margin: 6px 0 8px; font-size: 1.2rem; font-weight: 700; }
+      .beginner-step { color: #c9b8ff; font-size: 12px; font-weight: 600; }
+      #beginnerTeaser {
+        border: 1px dashed #3a3f52;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: #a9acb7;
+        margin-bottom: 12px;
+      }
+      .tutorial-highlight {
+        box-shadow: 0 0 0 3px #8fd694, 0 0 18px rgba(143, 214, 148, 0.45);
+        animation: tutorial-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes tutorial-pulse {
+        0%, 100% { box-shadow: 0 0 0 3px #8fd694, 0 0 12px rgba(143, 214, 148, 0.35); }
+        50% { box-shadow: 0 0 0 5px #8fd694, 0 0 22px rgba(143, 214, 148, 0.55); }
+      }
+      body[data-tutorial-active="1"] .app-header { margin-bottom: 16px; }
     </style>
   </head>
-  <body>
-    <h1>Marketplace Seller Simulator</h1>
-    <div class="row">
-      <button id="nextDayBtn" type="button">Next Day</button>
-      <button id="resetBtn" type="button" class="btn-secondary">Сброс</button>
-      <button id="saveBtn" type="button" class="btn-secondary">Сохранить</button>
-      <button id="loadBtn" type="button" class="btn-secondary">Загрузить</button>
-      <button id="exportJsonBtn" type="button" class="btn-secondary">Экспорт JSON</button>
-      <button id="exportPlaytestBtn" type="button" class="btn-secondary">Экспорт отчёта плейтеста</button>
-      <button id="exportServiceDiagBtn" type="button" class="btn-secondary">Экспорт диагностики сервиса</button>
-      <button id="exportPhase2Btn" type="button" class="btn-secondary">Экспорт phase2 build отчёта</button>
-      <button id="importJsonBtn" type="button" class="btn-secondary">Импорт JSON</button>
-      <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none" />
-      <span class="muted">Фаза 4 — онбординг, QoL</span>
-    </div>
+  <body data-ui-mode="player">
+    <div class="app-shell">
+      <header class="card app-header">
+        <h1>Симулятор продавца маркетплейса</h1>
+        <p class="muted app-tagline">Закупки · реклама · KPI · рост магазина</p>
+        <div class="row player-toolbar">
+          <button id="nextDayBtn" type="button" class="btn-primary">Следующий день</button>
+          <button id="skipTutorialBtn" type="button" class="btn-secondary">Пропустить обучение</button>
+          <button id="resetBtn" type="button" class="btn-secondary">Сброс рана</button>
+        </div>
+        <div class="row dev-toolbar" data-dev-only>
+          <button id="saveBtn" type="button" class="btn-secondary">Сохранить</button>
+          <button id="loadBtn" type="button" class="btn-secondary">Загрузить</button>
+          <button id="exportJsonBtn" type="button" class="btn-secondary">Экспорт JSON</button>
+          <button id="exportPlaytestBtn" type="button" class="btn-secondary">Экспорт плейтеста</button>
+          <button id="exportServiceDiagBtn" type="button" class="btn-secondary">Экспорт диагностики</button>
+          <button id="exportPhase2Btn" type="button" class="btn-secondary">Экспорт phase2</button>
+          <button id="importJsonBtn" type="button" class="btn-secondary">Импорт JSON</button>
+          <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none" />
+        </div>
+        <p id="devModeHint" class="dev-hint" data-dev-only hidden>Режим разработчика (<code>?dev=1</code>). Для скринов и игроков используйте URL без параметра.</p>
+      </header>
 
-    <div class="card">
-      <strong>Онбординг первого рана (дни 66–68)</strong>
-      <div id="onboardingPanel" class="muted">Подсказки появятся после инициализации.</div>
-      <div class="row" style="margin-top:8px;">
-        <button id="hideOnboardingBtn" type="button" class="btn-secondary">Скрыть онбординг</button>
+      <!-- === ИГРОК: онбординг → закупка → сводка === -->
+      <div class="card" data-ui-section="tutorial" data-beginner-min="1">
+        <strong class="card-title">Обучение</strong>
+        <div id="onboardingPanel" class="muted">Подсказки появятся после инициализации.</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="showAllSectionsBtn" type="button" class="btn-secondary">Показать все разделы</button>
+          <button id="hideOnboardingBtn" type="button" class="btn-secondary" data-beginner-min="2">Скрыть подсказки</button>
+        </div>
       </div>
-    </div>
 
-    <div class="card">
-      <strong>Платформа (день 18)</strong>
-      <div id="sdkStatus" class="muted">Проверка SDK…</div>
-      <div class="row" style="margin-top: 8px;">
-        <button id="rewardedBtn" type="button" class="btn-secondary">Получить rewarded +5 000</button>
-        <span id="rewardedHint" class="muted">Доступно после симуляции дня; 1 раз на день.</span>
-      </div>
-      <div id="interstitialHint" class="muted" style="margin-top: 6px;">Interstitial: ожидание первой симуляции.</div>
-      <p class="muted" style="margin: 8px 0 0;">Если Яндекс SDK недоступен, игра продолжает работать в обычном веб-режиме.</p>
-    </div>
-
-    <div class="card">
-      <strong>Реклама (день)</strong>
-      <div class="row" style="align-items: center; margin-top: 8px;">
-        <label class="field" style="min-width: 160px;">Статус
-          <label style="display:flex;align-items:center;gap:8px;color:#e7e7ea">
-            <input type="checkbox" id="adEnabledToggle" checked />
-            <span>Реклама включена</span>
+      <div class="card" data-ui-section="buy" data-beginner-min="1">
+        <strong class="card-title">Закупка на склад</strong>
+        <p class="muted" style="margin:0 0 8px">Сначала завезите товар — без него продаж не будет.</p>
+        <div class="row" style="margin-top: 4px;">
+          <button type="button" id="quickStartBtn" class="btn-primary">Стартовая закупка</button>
+        </div>
+        <div id="buyManualRow" class="row" style="align-items: flex-end; margin-top: 10px;">
+          <label class="field">Товар
+            <select id="skuSelect"></select>
           </label>
-        </label>
-        <label class="field" style="flex: 1; min-width: 200px;">Бюджет
-          <input type="range" id="adBudgetRange" min="0" max="15000" step="100" value="0" />
-        </label>
-        <span id="adBudgetLabel" class="muted">0</span>
+          <label class="field">Количество
+            <input type="number" id="qtyInput" min="1" value="80" step="1" />
+          </label>
+          <button type="button" id="buyBtn">Купить</button>
+        </div>
+        <p class="muted" id="buyHint" style="margin: 8px 0 0;"></p>
       </div>
-      <p class="muted" style="margin: 8px 0 0;">Рекламный трафик делится между SKU пропорционально <code>baseDemand</code>. При выключении рекламы списание в P&amp;L = 0.</p>
-    </div>
 
-    <div class="card">
-      <strong>Модель затрат (день 10)</strong>
-      <div class="row" style="align-items: flex-end; margin-top: 8px;">
-        <label class="field">Комиссия MP (доля)
-          <input id="feeRateInput" type="number" min="0" max="1" step="0.001" value="0.18" />
-        </label>
-        <label class="field">Эквайринг (доля)
-          <input id="paymentRateInput" type="number" min="0" max="1" step="0.001" value="0.01" />
-        </label>
-        <label class="field">Логистика/ед.
-          <input id="outboundCostInput" type="number" min="0" step="1" value="28" />
-        </label>
-        <label class="field">Оверхед/день
-          <input id="overheadInput" type="number" min="0" step="10" value="900" />
-        </label>
-        <button id="resetCostsBtn" type="button" class="btn-secondary">Сбросить затраты</button>
+      <div class="card" data-ui-section="summary" data-beginner-min="1">
+        <strong class="card-title">Сводка</strong>
+        <div id="summary"></div>
+        <div id="serviceRating" class="muted" data-beginner-min="3" style="margin-top:8px;">Рейтинг сервиса появится после первой симуляции.</div>
+        <div id="serviceDiagnostics" class="muted" data-beginner-min="4" style="margin-top:6px;">Диагностика появится позже.</div>
+        <div class="row" data-beginner-min="4" style="margin-top:8px;">
+          <label class="field">Категория
+            <select id="categoryFilterSelect"></select>
+          </label>
+        </div>
+        <div data-dev-only>
+          <div class="row" style="margin-top:8px;">
+            <button id="importServiceDiagBaseBtn" type="button" class="btn-secondary">Импорт baseline</button>
+            <button id="importServiceDiagCandBtn" type="button" class="btn-secondary">Импорт candidate</button>
+            <button id="clearServiceDiagCompareBtn" type="button" class="btn-secondary">Очистить сравнение</button>
+            <input id="importServiceDiagBaseInput" type="file" accept="application/json,.json" style="display:none" />
+            <input id="importServiceDiagCandInput" type="file" accept="application/json,.json" style="display:none" />
+          </div>
+          <div id="serviceDiagCompare" class="muted" style="margin-top:6px;">Сравнение baseline/candidate.</div>
+        </div>
       </div>
-      <p class="muted" style="margin: 8px 0 0;">COGS берется из <code>purchaseCost</code> каждого SKU (фикс в данных). Эти поля меняют только дневные ставки затрат.</p>
-    </div>
 
-    <div class="card">
-      <strong>Возвраты (день 11)</strong>
-      <div class="row" style="align-items: center; margin-top: 8px;">
-        <label class="field" style="flex: 1; min-width: 220px;">Модификатор доли возвратов
-          <input id="returnRateModRange" type="range" min="0.5" max="1.5" step="0.05" value="1" />
-        </label>
-        <span id="returnRateModLabel" class="muted">x1.00</span>
+      <div id="beginnerTeaser" class="card" data-ui-section="teaser" hidden></div>
+
+      <div class="card" data-ui-section="supplies" data-beginner-min="2">
+        <div><b>В пути</b></div>
+        <div id="incomingList" class="muted">Нет активных поставок</div>
+        <div style="margin-top:10px"><b>Приход на склад</b></div>
+        <div id="morningArrivals" class="muted">После «Следующий день» здесь появятся приходы.</div>
       </div>
-      <p class="muted" style="margin: 8px 0 0;">Возвраты считаются как <code>baseReturnRate × модификатор</code> (с ограничением до 95%). Чистая выручка = валовая выручка − сумма возвращённых заказов.</p>
-    </div>
 
-    <div class="card">
-      <strong>Карточка товара (по SKU)</strong>
-      <p class="muted" style="margin: 0 0 8px">Пресеты качества и цена влияют на конверсию; промо — небольшой буст. «Реком.» подставляет цену маркетплейса для строки.</p>
-      <div id="merchRoot"></div>
-    </div>
-
-    <div class="card">
-      <strong>Закупка</strong>
-      <div class="row" style="align-items: flex-end; margin-top: 8px;">
-        <label class="field">SKU
-          <select id="skuSelect"></select>
-        </label>
-        <label class="field">Количество
-          <input type="number" id="qtyInput" min="1" value="20" step="1" />
-        </label>
-        <button type="button" id="buyBtn">Купить</button>
+      <div class="card" data-ui-section="ad" data-beginner-min="2">
+        <strong class="card-title">Реклама</strong>
+        <p class="muted" style="margin:0 0 8px">Больше бюджет — больше заказов, но выше расходы.</p>
+        <div class="row" style="align-items: center; margin-top: 4px;">
+          <label class="field" style="min-width: 160px;">Статус
+            <label style="display:flex;align-items:center;gap:8px;color:#e7e7ea">
+              <input type="checkbox" id="adEnabledToggle" checked />
+              <span>Включена</span>
+            </label>
+          </label>
+          <label class="field" style="flex: 1; min-width: 200px;">Бюджет на день
+            <input type="range" id="adBudgetRange" min="0" max="15000" step="100" value="0" />
+          </label>
+          <span id="adBudgetLabel" class="muted">0</span>
+        </div>
       </div>
-      <p class="muted" id="buyHint" style="margin: 8px 0 0;"></p>
-    </div>
 
-    <div class="card">
-      <strong>В пути</strong>
-      <div id="incomingList" class="muted">Нет активных поставок</div>
-    </div>
-
-    <div class="card">
-      <strong>Поступление на склад (начало дня)</strong>
-      <div id="morningArrivals" class="muted">Партий ещё не было — после Next Day здесь появятся приходы до продаж этого дня.</div>
-      <p class="muted" style="margin: 8px 0 0;">Порядок: новый календарный день → приход всех партий с датой прибытия ≤ этому дню → затем симуляция продаж.</p>
-    </div>
-
-    <div class="card">
-      <strong>Summary</strong>
-      <div id="summary"></div>
-      <div id="serviceRating" class="muted" style="margin-top:8px;">Рейтинг сервиса появится после первой симуляции.</div>
-      <div id="serviceDiagnostics" class="muted" style="margin-top:6px;">Диагностика причины просадки появится после первой симуляции.</div>
-      <div class="row" style="margin-top:8px;">
-        <button id="importServiceDiagBaseBtn" type="button" class="btn-secondary">Импорт baseline (до)</button>
-        <button id="importServiceDiagCandBtn" type="button" class="btn-secondary">Импорт candidate (после)</button>
-        <button id="clearServiceDiagCompareBtn" type="button" class="btn-secondary">Очистить сравнение</button>
-        <input id="importServiceDiagBaseInput" type="file" accept="application/json,.json" style="display:none" />
-        <input id="importServiceDiagCandInput" type="file" accept="application/json,.json" style="display:none" />
+      <div class="card" data-ui-section="yesterday" data-beginner-min="3">
+        <strong class="card-title">Итог вчерашнего дня</strong>
+        <div id="yesterdayReport" class="muted">Ещё не было симуляции.</div>
       </div>
-      <div id="serviceDiagCompare" class="muted" style="margin-top:6px;">Сравнение baseline/candidate появится после импорта двух отчётов.</div>
-      <div class="row" style="margin-top:8px;">
-        <label class="field">Категория для просмотра
-          <select id="categoryFilterSelect"></select>
-        </label>
+
+      <div class="card" data-ui-section="kpi" data-beginner-min="3">
+        <strong class="card-title">Показатели (KPI)</strong>
+        <div id="kpiChartsRow" class="kpi-charts-row muted">Графики появятся после первого дня.</div>
+        <div id="kpiDashboard" class="kpi-grid">
+          <div class="muted">Нет данных — нажмите «Следующий день».</div>
+        </div>
+        <div id="kpiAlertsPanel" class="muted" data-beginner-min="4" style="margin-top:10px;">Подсказки появятся после первой симуляции.</div>
+        <div id="categoryKpiTable" class="muted" data-beginner-min="4" style="margin-top:8px;">По категориям — позже.</div>
+        <div id="categoryRecommendations" class="muted" data-beginner-min="4" style="margin-top:8px;">Рекомендации — позже.</div>
+        <div class="row" data-beginner-min="4" style="margin-top:10px; align-items:flex-end;">
+          <label class="field">Фильтр остатков
+            <select id="skuStockFilterSelect">
+              <option value="all">Все SKU</option>
+              <option value="in_stock">В наличии</option>
+              <option value="low_stock">Низкий запас</option>
+              <option value="out_of_stock">Нет на складе</option>
+            </select>
+          </label>
+          <label class="field" style="flex:1; min-width:180px;">Поиск
+            <input type="search" id="skuSearchInput" placeholder="имя товара" />
+          </label>
+        </div>
+        <div data-beginner-min="4" style="margin-top:10px"><b>Быстрые пресеты</b></div>
+        <div id="qolPresetsPanel" class="muted" data-beginner-min="4" style="margin-top:4px;">Пресеты позже.</div>
       </div>
-      <p class="muted" style="margin: 8px 0 0;">Остатки по SKU — в объекте <code>inStock</code> (ключ = <code>id</code> товара), не внутри массива <code>skus</code>.</p>
-    </div>
 
-    <div class="card">
-      <strong>Команда (фаза 3)</strong>
-      <div id="teamPanel" class="muted">Панель команды появится после инициализации.</div>
-      <p class="muted" style="margin: 8px 0 0;">ЗП списывается ежедневно в P&amp;L после найма узлов ветки «Команда».</p>
-    </div>
-
-    <div class="card">
-      <strong>Стили игры (дни 59–64)</strong>
-      <div id="playStylesMeta" class="muted">Три стиля: маркетинг, операционка, ассортимент.</div>
-      <div id="playStylesPanel" class="muted" style="margin-top:8px;">Кнопки стилей появятся после инициализации.</div>
-    </div>
-
-    <div class="card">
-      <strong>Антиэксплойт (дни 59–64)</strong>
-      <div id="antiExploitPanel" class="muted">Мягкие проверки ad-only, zero-risk и перестекинга MKT+AUTO.</div>
-    </div>
-
-    <div class="card">
-      <strong>Phase 3 — регрессии и freeze (дни 65–69)</strong>
-      <div class="row" style="margin-top:8px;">
-        <button id="runRegression14Btn" type="button" class="btn-secondary">Регрессия 14 дней</button>
-        <button id="runRegression28Btn" type="button" class="btn-secondary">Регрессия 28 дней</button>
-        <button id="runStyleBalanceBtn" type="button" class="btn-secondary">Аудит баланса 3 стилей</button>
-        <button id="exportPhase3FreezeBtn" type="button" class="btn-secondary">Экспорт Phase 3 freeze</button>
+      <div class="card" data-ui-section="cost" data-beginner-min="3">
+        <strong class="card-title">Затраты за день</strong>
+        <div id="costBreakdown" class="muted">Нет данных — нажмите «Следующий день».</div>
       </div>
-      <div id="phase3RegressionStatus" class="muted" style="margin-top:6px;">Длинные регрессии: не запускались.</div>
-      <div id="phase3FreezeSummary" class="muted" style="margin-top:8px;">Сводка Phase 3 freeze появится после прогонов.</div>
-    </div>
 
-    <div class="card">
-      <strong>Прогрессия (34 узла)</strong>
-      <div id="progressionMeta" class="muted">Узлы прогрессии появятся после инициализации.</div>
-      <div id="progressionPanel" class="muted" style="margin-top:8px;">Нет данных прогрессии.</div>
-    </div>
+      <div class="card" data-ui-section="merch" data-beginner-min="3">
+        <strong class="card-title">Цены и качество карточек</strong>
+        <p class="muted" style="margin: 0 0 8px">Можно оставить как есть в начале — цены уже подставлены.</p>
+        <div id="merchRoot"></div>
+      </div>
 
-    <div class="card">
-      <strong>Кампания 60 дней (дни 38–41)</strong>
-      <div id="campaignReadability" class="muted">Прогноз кампании появится после первой симуляции.</div>
-    </div>
+      <div class="card" data-ui-section="stock" data-beginner-min="3">
+        <strong class="card-title">Склад</strong>
+        <div id="stockTable"></div>
+      </div>
 
-    <div class="card">
-      <strong>События (v3 — 24)</strong>
-      <div id="eventsPanel" class="muted">Панель событий появится после инициализации.</div>
-      <p class="muted" style="margin: 8px 0 0;">Вероятность события в день ~18%. Если 6 дней без события — на 7-й pity. Не больше одного события в день.</p>
-    </div>
+      <div class="card" data-ui-section="styles" data-beginner-min="4">
+        <strong class="card-title">Стиль игры</strong>
+        <div id="playStylesMeta" class="muted">Маркетолог, оператор или ассортимент.</div>
+        <div id="playStylesPanel" class="muted" style="margin-top:8px;">Стили появятся после инициализации.</div>
+      </div>
 
-    <div class="card">
-      <strong>Phase 2 Freeze</strong>
-      <div id="phase2FreezeSummary" class="muted">Сводка готовности фазы 2 появится после инициализации.</div>
-      <div class="row" style="margin-top:8px;">
-        <button id="exportPhase2FreezeBtn" type="button" class="btn-secondary">Экспорт Phase 2 freeze отчёта</button>
+      <div class="card" data-ui-section="progression" data-beginner-min="4">
+        <strong class="card-title">Прогрессия</strong>
+        <div id="progressionMeta" class="muted">Узлы прокачки магазина.</div>
+        <div id="progressionPanel" class="muted" style="margin-top:8px;">Нет данных прогрессии.</div>
+      </div>
+
+      <div class="card" data-ui-section="events" data-beginner-min="4">
+        <strong class="card-title">События рынка</strong>
+        <div id="eventsPanel" class="muted">События появятся после инициализации.</div>
+      </div>
+
+      <div class="card" data-ui-section="team" data-beginner-min="4">
+        <strong class="card-title">Команда</strong>
+        <div id="teamPanel" class="muted">Панель команды появится после инициализации.</div>
+      </div>
+
+      <div class="card" data-ui-section="campaign" data-beginner-min="4">
+        <strong class="card-title">Прогноз кампании</strong>
+        <div id="campaignReadability" class="muted">Прогноз появится после первой симуляции.</div>
+      </div>
+
+      <div class="card" data-ui-section="rescue" data-beginner-min="3">
+        <strong class="card-title">Помощь при тупике</strong>
+        <div id="deadlockStatus" class="muted">Статус появится после первой симуляции.</div>
+        <div class="row" style="margin-top: 8px;">
+          <button id="rescueBtn" type="button" class="btn-secondary">Экстренный аванс +20 000</button>
+        </div>
+      </div>
+
+      <div class="card" data-ui-section="platform" data-beginner-min="4">
+        <strong class="card-title">Бонусы и платформа</strong>
+        <div id="sdkStatus" class="muted">Проверка SDK…</div>
+        <div class="row" style="margin-top: 8px;">
+          <button id="rewardedBtn" type="button" class="btn-secondary">Бонус за просмотр +5 000</button>
+          <span id="rewardedHint" class="muted">Доступно после симуляции дня.</span>
+        </div>
+        <div id="interstitialHint" class="muted" style="margin-top: 6px;"></div>
+        <p class="muted" data-dev-only style="margin: 8px 0 0;">SDK: localhost — mock; ЯИ — <code>/sdk.js</code>; тест — <code>?ysdk=1</code>.</p>
+      </div>
+
+      <div class="card" data-ui-section="feedback" data-beginner-min="4">
+        <strong class="card-title">Обратная связь</strong>
+        <div id="supportChannelsPanel" class="row" style="margin-top:4px;"></div>
+        <div id="supportChannelStatus" class="muted" style="margin-top:4px;"></div>
+        <div class="row" style="align-items:flex-end; margin-top:8px;">
+          <label class="field" style="min-width:180px;">Тема
+            <select id="feedbackCategorySelect"></select>
+          </label>
+          <label class="field" style="flex:1; min-width:260px;">Сообщение
+            <textarea id="feedbackTextInput" rows="2" placeholder="Баг, баланс, идея…" style="background:#252836;border:1px solid #2b2e3a;color:#e7e7ea;padding:6px 8px;border-radius:6px;resize:vertical;width:100%;"></textarea>
+          </label>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button id="submitFeedbackBtn" type="button" class="btn-secondary">Отправить</button>
+        </div>
+        <div data-dev-only style="margin-top:8px;">
+          <div id="softLaunchPanel" class="muted">Пакет софт-ланча.</div>
+          <div class="row" style="margin-top:8px;">
+            <button id="exportSoftLaunchBtn" type="button" class="btn-secondary">Экспорт софт-ланча</button>
+            <button id="exportFeedbackBtn" type="button" class="btn-secondary">Экспорт feedback</button>
+            <button id="exportAnalyticsBtn" type="button" class="btn-secondary">Экспорт аналитики</button>
+            <button id="importFeedbackBtn" type="button" class="btn-secondary">Импорт feedback</button>
+            <input id="importFeedbackInput" type="file" accept="application/json,.json" style="display:none" />
+          </div>
+        </div>
+      </div>
+
+      <!-- === DEV: внутренние панели === -->
+      <div class="card" data-dev-only>
+        <strong>Модель затрат (dev)</strong>
+        <div class="row" style="align-items: flex-end; margin-top: 8px;">
+          <label class="field">Комиссия MP
+            <input id="feeRateInput" type="number" min="0" max="1" step="0.001" value="0.18" />
+          </label>
+          <label class="field">Эквайринг
+            <input id="paymentRateInput" type="number" min="0" max="1" step="0.001" value="0.01" />
+          </label>
+          <label class="field">Логистика/ед.
+            <input id="outboundCostInput" type="number" min="0" step="1" value="28" />
+          </label>
+          <label class="field">Оверхед/день
+            <input id="overheadInput" type="number" min="0" step="10" value="900" />
+          </label>
+          <button id="resetCostsBtn" type="button" class="btn-secondary">Сбросить</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Возвраты (dev)</strong>
+        <div class="row" style="align-items: center; margin-top: 8px;">
+          <label class="field" style="flex: 1; min-width: 220px;">Модификатор возвратов
+            <input id="returnRateModRange" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+          </label>
+          <span id="returnRateModLabel" class="muted">x1.00</span>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Антиэксплойт</strong>
+        <div id="antiExploitPanel" class="muted">Мягкие проверки ad-only, zero-risk и перестекинга.</div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Phase 3 — регрессии</strong>
+        <div class="row" style="margin-top:8px;">
+          <button id="runRegression14Btn" type="button" class="btn-secondary">14 дней</button>
+          <button id="runRegression28Btn" type="button" class="btn-secondary">28 дней</button>
+          <button id="runStyleBalanceBtn" type="button" class="btn-secondary">Аудит стилей</button>
+          <button id="exportPhase3FreezeBtn" type="button" class="btn-secondary">Экспорт freeze</button>
+        </div>
+        <div id="phase3RegressionStatus" class="muted" style="margin-top:6px;">Не запускались.</div>
+        <div id="phase3FreezeSummary" class="muted" style="margin-top:8px;">Сводка Phase 3.</div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Phase 2 Freeze</strong>
+        <div id="phase2FreezeSummary" class="muted">Сводка фазы 2.</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="exportPhase2FreezeBtn" type="button" class="btn-secondary">Экспорт отчёта</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Phase 2 internal build</strong>
+        <div class="row" style="margin-top:8px;">
+          <button id="applyBalanceConservativeBtn" type="button" class="btn-secondary">Conservative</button>
+          <button id="applyBalanceGrowthBtn" type="button" class="btn-secondary">Growth</button>
+          <button id="runRegression7Btn" type="button" class="btn-secondary">Регрессия 7д</button>
+          <button id="runPreReleaseBtn" type="button" class="btn-secondary">Pre-release run</button>
+          <button id="quickRestockBtn" type="button" class="btn-secondary">Экстренный restock</button>
+          <button id="quickStabilizeBtn" type="button" class="btn-secondary">Стабилизация</button>
+          <button id="safeRecoveryV2Btn" type="button" class="btn-secondary">Safe recovery v2</button>
+        </div>
+        <div id="regressionRunStatus" class="muted" style="margin-top:6px;">Регрессия: не запускалась.</div>
+        <div id="phase2BuildStatus" class="muted" style="margin-top:6px;">Сводка build.</div>
+        <div id="releaseSmokeChecklist" class="muted" style="margin-top:8px;">Release smoke.</div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Баланс фазы 4</strong>
+        <div id="phase4BalancePanel" class="muted" style="margin-top:8px;">Аудит баланса.</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="runBalanceSim14Btn" type="button" class="btn-secondary">Симуляция 14д</button>
+          <button id="exportPhase4BalanceBtn" type="button" class="btn-secondary">Экспорт отчёта</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Телеметрия и триаж</strong>
+        <div id="telemetryPanel" class="muted" style="margin-top:8px;">Телеметрия.</div>
+        <div id="triagePanel" class="muted" style="margin-top:8px;">Триаж.</div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Закрытие фазы 4</strong>
+        <div id="majorBugsPanel" class="muted" style="margin-top:8px;">Major-баги.</div>
+        <div id="phase4CloseoutPanel" class="muted" style="margin-top:8px;">Гейты удержания.</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="exportPhase4CloseoutBtn" type="button" class="btn-secondary">Экспорт closeout</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Плейтест</strong>
+        <div id="playtestChecklist" class="muted">Чеклист.</div>
+        <div class="row" style="align-items:flex-end; margin-top:8px;">
+          <label class="field" style="flex:1; min-width:260px;">Заметки
+            <textarea id="playtestNotesInput" rows="3" style="background:#252836;border:1px solid #2b2e3a;color:#e7e7ea;padding:6px 8px;border-radius:6px;resize:vertical;width:100%;"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>M1 Freeze</strong>
+        <div id="freezeSummary" class="muted">Сводка M1.</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="exportFreezeBtn" type="button" class="btn-secondary">Экспорт отчёта</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Release build и браузеры</strong>
+        <div id="browserCompatPanel" class="muted" style="margin-top:8px;">Проверка браузера…</div>
+        <div id="releaseBuildPanel" class="muted" style="margin-top:8px;">Статус сборки…</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="exportReleaseReadinessBtn" type="button" class="btn-secondary">Экспорт readiness</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>Витрина Яндекс Игр</strong>
+        <div id="storeListingPanel" class="muted" style="margin-top:8px;">Тексты витрины…</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="exportStoreListingBtn" type="button" class="btn-secondary">Экспорт listing</button>
+        </div>
+      </div>
+
+      <div class="card" data-dev-only>
+        <strong>State Debug</strong>
+        <pre id="stateDump"></pre>
       </div>
     </div>
 
-    <div class="card">
-      <strong>Phase 2 internal build (дни 42–45)</strong>
-      <div class="row" style="margin-top:8px;">
-        <button id="applyBalanceConservativeBtn" type="button" class="btn-secondary">Баланс preset: Conservative</button>
-        <button id="applyBalanceGrowthBtn" type="button" class="btn-secondary">Баланс preset: Growth</button>
-        <button id="runRegression7Btn" type="button" class="btn-secondary">Прогон регрессии 7 дней</button>
-        <button id="runPreReleaseBtn" type="button" class="btn-secondary">Pre-release run (1 клик)</button>
-        <button id="quickRestockBtn" type="button" class="btn-secondary">Антикризис: экстренное пополнение</button>
-        <button id="quickStabilizeBtn" type="button" class="btn-secondary">Антикризис: стабилизация маржи</button>
-        <button id="safeRecoveryV2Btn" type="button" class="btn-secondary">Safe recovery v2 (anti-stockout)</button>
-      </div>
-      <div id="regressionRunStatus" class="muted" style="margin-top:6px;">Регрессия: не запускалась.</div>
-      <div id="phase2BuildStatus" class="muted" style="margin-top:6px;">Сводка phase2 build появится после первой симуляции.</div>
-      <div id="releaseSmokeChecklist" class="muted" style="margin-top:8px;">Release smoke checklist появится после первой симуляции.</div>
-    </div>
+    <script>
+      (function bootMssim() {
+        var host = (window.location.hostname || "").toLowerCase();
+        var params = new URLSearchParams(window.location.search);
+        var onYandexHost =
+          host.indexOf("yandex.") !== -1 || host.indexOf("yandexgames.") !== -1;
+        var forceSdk = params.get("ysdk") === "1";
+        var sdkSrc = onYandexHost
+          ? "/sdk.js"
+          : forceSdk
+            ? "https://sdk.games.s3.yandex.net/sdk.js"
+            : "";
 
-    <div class="card">
-      <strong>KPI Dashboard (день 13)</strong>
-      <div id="kpiDashboard" class="kpi-grid">
-        <div class="muted">Нет данных — сначала нажми Next Day.</div>
-      </div>
-      <div id="categoryKpiTable" class="muted" style="margin-top:8px;">Категорийный срез появится после первой симуляции.</div>
-      <div id="categoryRecommendations" class="muted" style="margin-top:8px;">Рекомендации по категориям появятся после первой симуляции.</div>
-    </div>
+        function startApp() {
+          var el = document.createElement("script");
+          el.type = "module";
+          el.src = "./src/app.js";
+          document.body.appendChild(el);
+        }
 
-    <div class="card">
-      <strong>Плейтест (день 19)</strong>
-      <div id="playtestChecklist" class="muted">Чеклист плейтеста появится здесь.</div>
-      <div class="row" style="align-items:flex-end; margin-top:8px;">
-        <label class="field" style="flex:1; min-width:260px;">Заметки по плейтесту
-          <textarea id="playtestNotesInput" rows="3" style="background:#252836;border:1px solid #2b2e3a;color:#e7e7ea;padding:6px 8px;border-radius:6px;resize:vertical;"></textarea>
-        </label>
-      </div>
-    </div>
+        if (!sdkSrc) {
+          startApp();
+          return;
+        }
 
-    <div class="card">
-      <strong>M1 Freeze (день 21)</strong>
-      <div id="freezeSummary" class="muted">Сводка готовности появится после первой симуляции.</div>
-      <div class="row" style="margin-top:8px;">
-        <button id="exportFreezeBtn" type="button" class="btn-secondary">Экспорт M1 freeze отчёта</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <strong>Анти-тупик (день 12)</strong>
-      <div id="deadlockStatus" class="muted">Статус анти-тупика появится после первой симуляции.</div>
-      <div class="row" style="margin-top: 8px;">
-        <button id="rescueBtn" type="button" class="btn-secondary">Антикризисный аванс +20 000</button>
-        <span class="muted">Доступно только в тупике: нет остатков, нет поставок в пути, не хватает кэша на минимальную закупку.</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <strong>Склад (остатки по SKU)</strong>
-      <div id="stockTable"></div>
-    </div>
-
-    <div class="card">
-      <strong>Итог вчерашнего дня</strong>
-      <div id="yesterdayReport" class="muted">Ещё не было симуляции (нажми Next Day).</div>
-    </div>
-
-    <div class="card">
-      <strong>Разбивка затрат (день 14)</strong>
-      <div id="costBreakdown" class="muted">Нет данных — сначала нажми Next Day.</div>
-    </div>
-
-    <div class="card">
-      <strong>State Debug</strong>
-      <pre id="stateDump"></pre>
-    </div>
-
-    <script type="module" src="./src/app.js"></script>
+        var s = document.createElement("script");
+        s.src = sdkSrc;
+        s.async = true;
+        s.onload = startApp;
+        s.onerror = function () {
+          console.warn("Yandex SDK: не удалось загрузить", sdkSrc);
+          startApp();
+        };
+        document.head.appendChild(s);
+      })();
+    </script>
   </body>
 </html>

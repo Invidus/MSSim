@@ -1,0 +1,34 @@
+[
+  {
+    "id": "qol_operator",
+    "label": "Стиль: Оператор",
+    "desc": "Консервативная реклама и расходы",
+    "action": "play_style",
+    "param": "operator"
+  },
+  {
+    "id": "qol_assortment",
+    "label": "Стиль: Ассортимент",
+    "desc": "Баланс маржи и портфеля",
+    "action": "play_style",
+    "param": "assortment"
+  },
+  {
+    "id": "qol_restock",
+    "label": "Быстрый restock",
+    "desc": "Экстренное пополнение top SKU",
+    "action": "quick_restock"
+  },
+  {
+    "id": "qol_stabilize",
+    "label": "Стабилизация маржи",
+    "desc": "Снизить рекламу, подтянуть цены",
+    "action": "quick_stabilize"
+  },
+  {
+    "id": "qol_recovery",
+    "label": "Safe recovery v2",
+    "desc": "Anti-stockout пресет",
+    "action": "safe_recovery"
+  }
+]

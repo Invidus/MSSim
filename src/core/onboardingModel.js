@@ -16,6 +16,8 @@ export function checkOnboardingCondition(state, check) {
       return !!state?.lastDayReport;
     case "kpi_seen":
       return !!state?.lastDayReport && Number(state?.day) >= 1;
+    case "day_2":
+      return Number(state?.day) >= 2 && !!state?.lastDayReport;
     case "play_style":
       return !!state?.playStyleId;
     case "day_7_profit": {
@@ -85,49 +87,49 @@ export function getErrorHints(state) {
     hints.push({
       id: "hint_simulate",
       severity: "info",
-      text: "Симуляция ещё не запускалась — нажмите Next Day после закупки.",
+      text: "Нажмите «Следующий день» — так начнутся продажи.",
     });
   }
   if (stock <= 0 && incoming <= 0 && Number(state.day) <= 5) {
     hints.push({
       id: "hint_buy",
       severity: "high",
-      text: "Нет остатков и поставок — закупите SKU, иначе продаж не будет.",
+      text: "Склад пуст — закупите товар, иначе продаж не будет.",
     });
   }
   if (state.lastDayReport && Number(k.stockoutRate) > 0.2) {
     hints.push({
       id: "hint_stockout",
       severity: "high",
-      text: `Высокий stockout (${(Number(k.stockoutRate) * 100).toFixed(0)}%) — увеличьте закупку или снизьте рекламу.`,
+      text: "Товара не хватило на все заказы — увеличьте закупку.",
     });
   }
   if (state.lastDayReport && Number(k.profit) < 0) {
     hints.push({
       id: "hint_profit",
       severity: "medium",
-      text: "Отрицательная прибыль — поднимите цены, снизьте рекламу или выберите стиль «Оператор».",
+      text: "Вы в минусе — снизьте рекламу или поднимите цены на товары.",
     });
   }
   if (state.lastDayReport && Number(k.returnPct) > 0.14) {
     hints.push({
       id: "hint_returns",
       severity: "medium",
-      text: "Высокие возвраты — улучшите качество карточки и не завышайте цену.",
+      text: "Много возвратов — улучшите качество карточки товара.",
     });
   }
   if (state.lastDayReport && Number(k.daysOfStock) < 1 && stock > 0) {
     hints.push({
       id: "hint_days_stock",
       severity: "medium",
-      text: "Запас меньше 1 дня продаж — планируйте дозаказ заранее.",
+      text: "Товара хватит меньше чем на день — закупите заранее.",
     });
   }
-  if (!state.playStyleId && !!state.lastDayReport) {
+  if (!state.playStyleId && !!state.lastDayReport && Number(state.day) >= 3) {
     hints.push({
       id: "hint_style",
       severity: "low",
-      text: "Выберите стиль игры — так проще держать баланс расходов.",
+      text: "Выберите стиль игры — так проще планировать расходы.",
     });
   }
   const order = { high: 0, medium: 1, low: 2, info: 3 };

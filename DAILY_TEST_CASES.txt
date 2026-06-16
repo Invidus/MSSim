@@ -926,6 +926,287 @@ ID тест-кейса: D68-ONBOARD-HINTS-001
 - hints реагируют на stockout/убыток/возвраты.
 - ob_style в completed после выбора стиля.
 
+День 70 - Автосохранение и автозагрузка
+---------------------------------------
+ID тест-кейса: D70-AUTOSAVE-001
+Шаги:
+1) `mssim._test.runAutosaveSmoke()` — 3× ✅, в консоли подсказка про F5.
+2) Перезагрузить страницу (F5).
+3) `mssim._test.checkAutoload()` — день совпадает с сохранённым.
+4) «Сброс» с подтверждением — save очищен.
+Ожидаемый результат:
+- Автосохранение после Next Day без кнопки «Сохранить».
+- Автозагрузка при старте.
+- Экспорт JSON по-прежнему работает как резервная копия.
+
+День 71 - Фильтры SKU
+----------------------
+ID тест-кейса: D71-SKU-FILTER-001
+Шаги:
+1) Ctrl+F5, блок QoL — фильтр «Нет на складе», поиск `lip`.
+2) `mssim._test.runQolSmoke()` — 4× ✅.
+Ожидаемый результат:
+- Закупка и merch показывают отфильтрованный список.
+
+День 72 - KPI-алерты
+--------------------
+ID тест-кейса: D72-KPI-ALERTS-001
+Шаги:
+1) `mssim._test.zeroStock(); mssim.applyPlayStyle("marketer"); mssim.nextDay();`
+2) `mssim.getKpiAlerts()` — массив с high/medium алертами.
+Ожидаемый результат:
+- Панель KPI-алертов не пустая при проблемных KPI.
+
+День 73 - Быстрые пресеты
+-------------------------
+ID тест-кейса: D73-QOL-PRESETS-001
+Шаги:
+1) Нажать «Стиль: Оператор» в QoL или `mssim.applyQolPreset("qol_operator")`.
+2) Проверить playStyleId и adBudget.
+Ожидаемый результат:
+- Пресеты вызывают play style / restock / stabilize.
+
+День 74 - Баланс: рычаг возвратов
+---------------------------------
+ID тест-кейса: D74-RETURNS-LEVERAGE-001
+Шаги:
+1) Ctrl+F5, блок «Баланс возвратов и событий (дни 72–74)».
+2) `mssim._test.runBalanceSmoke()` — проверки D74–D76.
+3) В панели: снижение возвратов >= 30% (baseline → оптимизация).
+Ожидаемый результат:
+- `auditReturnsLeverage.pass === true`.
+- Качество карточки влияет на returnRate в daySim.
+
+День 75 - Баланс: симуляция событий 14д
+---------------------------------------
+ID тест-кейса: D75-EVENTS-SIM-001
+Шаги:
+1) Кнопка «Симуляция баланса 14 дней» или `mssim.runBalanceSim14()`.
+2) Проверить `phase4BalanceLastSim.eventsAudit` в состоянии.
+Ожидаемый результат:
+- Симуляция не ломает state; в панели — счётчик событий за 14д.
+- Активных негативных <= 2 (кап eventEngine).
+
+День 76 - Экспорт отчёта баланса
+--------------------------------
+ID тест-кейса: D76-BALANCE-EXPORT-001
+Шаги:
+1) После симуляции: кнопка «Экспорт отчёта баланса» или `mssim.getPhase4Balance()`.
+2) JSON содержит `decision`, `checks`, `returnsAudit`, `eventsAudit`.
+Ожидаемый результат:
+- Файл `mssim-phase4-balance-day-N.json` скачивается.
+- checks.length >= 5, returns-leverage = PASS.
+
+День 77 - Облачное сохранение: синхронизация
+---------------------------------------------
+ID тест-кейса: D77-CLOUD-SYNC-001
+Шаги:
+1) Ctrl+F5, блок «Платформа» — cloud mock или yandex.
+2) `await mssim._test.runCloudSaveSmoke()`.
+Ожидаемый результат:
+- localStorage `marketplace_seller_sim_v1` и mock `marketplace_seller_sim_cloud_v1` заполнены.
+- `getAutoSaveStatus().cloudSource` = mock или yandex.
+
+День 78 - Облачное сохранение: merge
+------------------------------------
+ID тест-кейса: D78-CLOUD-MERGE-001
+Шаги:
+1) В рамках `runCloudSaveSmoke` cloud опережает local на +5 дней.
+2) Проверить, что применился cloud (день больше).
+Ожидаемый результат:
+- `resolveBestSave` выбирает cloud.
+- local перезаписан cloud-сохранением.
+
+День 79 - Облачное сохранение: автозагрузка
+-------------------------------------------
+ID тест-кейса: D79-CLOUD-AUTOLOAD-001
+Шаги:
+1) После D77–D78: F5.
+2) `mssim._test.checkCloudAutoload()`.
+Ожидаемый результат:
+- День совпадает с ожидаемым из sessionStorage.
+- local восстановлен из cloud при старте.
+
+День 80 - Пакет софт-ланча
+--------------------------
+ID тест-кейса: D80-SOFT-LAUNCH-001
+Шаги:
+1) Ctrl+F5, блок «Софт-ланч и поддержка».
+2) `mssim._test.runSoftLaunchSmoke()`.
+Ожидаемый результат:
+- Пакет содержит readiness checks (>= 10), listing, phase3/phase4 сводки.
+- Кнопка «Экспорт пакета софт-ланча» скачивает JSON.
+
+День 81 - Журнал обратной связи
+-------------------------------
+ID тест-кейса: D81-FEEDBACK-LOG-001
+Шаги:
+1) В UI: категория «Баг», текст, «Отправить в журнал».
+2) Или `mssim.submitFeedback("bug", "тест")`.
+Ожидаемый результат:
+- Запись в `gameState.feedbackLog`, счётчик feedback в панели растёт.
+- Сохраняется в autosave.
+
+День 82 - Экспорт feedback для триажа
+-------------------------------------
+ID тест-кейса: D82-FEEDBACK-TRIAGE-001
+Шаги:
+1) После D81: «Экспорт feedback для триажа» или `mssim.getFeedbackTriage()`.
+Ожидаемый результат:
+- JSON с `summary.byCategory`, `entries`, snapshot KPI.
+- Файл `mssim-feedback-triage-day-N.json`.
+
+День 83 - Триаж: приоритет и статус
+----------------------------------
+ID тест-кейса: D83-TRIAGE-STATUS-001
+Шаги:
+1) `mssim.submitFeedback("bug", "тест триажа")`.
+2) Проверить `triageStatus: open`, `priority: high`.
+Ожидаемый результат:
+- Запись в triage-панели с кнопками статусов.
+
+День 84 - Триаж: смена статуса
+------------------------------
+ID тест-кейса: D84-TRIAGE-UPDATE-001
+Шаги:
+1) `mssim.setFeedbackTriage(entryId, "investigating")`.
+2) Или кнопка `investigating` в UI.
+Ожидаемый результат:
+- Статус обновлён, autosave сохраняет.
+
+День 85 - Телеметрия сессии
+---------------------------
+ID тест-кейса: D85-TELEMETRY-001
+Шаги:
+1) `mssim.nextDay()`.
+2) `mssim.getSoftLaunchAnalytics()`.
+Ожидаемый результат:
+- `telemetryLog` содержит снимок дня.
+- `retention.proxyD1Return` при day >= 2.
+
+День 86 - Экспорт аналитики
+---------------------------
+ID тест-кейса: D86-ANALYTICS-EXPORT-001
+Шаги:
+1) Кнопка «Экспорт аналитики 77–78» или smoke `mssim._test.runTriageSmoke()`.
+Ожидаемый результат:
+- JSON `mssim-analytics-day-N.json` с triage + retention + telemetryLog.
+
+День 87 - Major-баги: реестр и лимит
+------------------------------------
+ID тест-кейса: D87-MAJOR-BUGS-001
+Шаги:
+1) Блок «Закрытие фазы 4» — реестр MB-001..003.
+2) `mssim._test.runRetentionCloseoutSmoke()`.
+Ожидаемый результат:
+- Открытых major <= 5 (лимит из retention_gates.json).
+
+День 88 - Phase 4 closeout отчёт
+--------------------------------
+ID тест-кейса: D88-CLOSEOUT-001
+Шаги:
+1) `mssim.getPhase4Closeout()`.
+2) Кнопка «Экспорт Phase 4 closeout».
+Ожидаемый результат:
+- `decision`, `retentionGates.checks`, `majorBugs`, `retentionCohort`.
+
+День 89 - Метрики удержания визита
+----------------------------------
+ID тест-кейса: D89-RETENTION-VISIT-001
+Шаги:
+1) При day >= 2: `visitMetrics.reachedDay2 === true`.
+2) Сброс игры увеличивает `retentionCohort.visits`.
+Ожидаемый результат:
+- Когорта D1/день14% считается после >= 3 визитов.
+
+День 90 - Совместимость браузера
+--------------------------------
+ID тест-кейса: D90-BROWSER-COMPAT-001
+Шаги:
+1) Ctrl+F5, блок «Release build и браузеры».
+2) `mssim._test.runBuildCompatSmoke()`.
+Ожидаемый результат:
+- `getBrowserCompat().supported === true`.
+- localStorage и fetch — PASS.
+
+День 91 - Release readiness отчёт
+---------------------------------
+ID тест-кейса: D91-RELEASE-READY-001
+Шаги:
+1) `npm run build`, перезагрузить страницу.
+2) `mssim.getReleaseReadiness()`.
+Ожидаемый результат:
+- `mode: release`, checks включают compat и manifest.
+- State Debug скрыт (`data-dev-only`).
+
+День 92 - Release-сборка dist
+-----------------------------
+ID тест-кейса: D92-RELEASE-BUILD-001
+Шаги:
+1) `npm run build` — папка `dist/`, ~350 KB.
+2) `npm run preview` — игра открывается из dist.
+Ожидаемый результат:
+- `build-manifest.json` с `fileCount >= 10`.
+
+День 93 - Тексты витрины ЯИ
+----------------------------
+ID тест-кейса: D93-STORE-LISTING-001
+Шаги:
+1) Ctrl+F5, блок «Витрина Яндекс Игр (дни 83–84)».
+2) `mssim._test.runStoreListingSmoke()`.
+Ожидаемый результат:
+- Название и краткое описание на русском.
+- `getStoreListing().block === "83-84"`.
+
+День 94 - Валидация лимитов и ассетов
+-------------------------------------
+ID тест-кейса: D94-STORE-ASSETS-001
+Шаги:
+1) `mssim.getStoreListing().validation`.
+2) Проверить папку `assets/store/` (иконка, обложка, 3 скрина).
+Ожидаемый результат:
+- checks >= 8, screenshots >= 3.
+- Иконка 512×512, обложка 800×470.
+
+День 95 - Экспорт пакета для консоли
+------------------------------------
+ID тест-кейса: D95-STORE-EXPORT-001
+Шаги:
+1) Кнопка «Экспорт store listing» или `JSON.stringify(mssim.getStoreListing(), null, 2)`.
+2) `npm run build` — в `dist/assets/store/` есть SVG.
+Ожидаемый результат:
+- Файл `mssim-store-listing.json` с `copyPaste` (title, descriptions, keywords).
+- decision: READY или READY WITH RISKS.
+
+День 96 - Player UI mode
+------------------------
+ID тест-кейса: D96-PLAYER-UI-001
+Шаги:
+1) Ctrl+F5 без `?dev=1`.
+2) `mssim._test.runPlayerUiSmoke()`.
+Ожидаемый результат:
+- `getUiMode() === "player"`.
+- Phase-панели, State Debug, Release build — не видны.
+
+День 97 - Dev mode toggle
+-------------------------
+ID тест-кейса: D97-DEV-MODE-001
+Шаги:
+1) Открыть `?dev=1` в URL, F5.
+2) `mssim.getUiMode()`.
+Ожидаемый результат:
+- mode `dev`, dev-панели и экспорты видны.
+
+День 98 - Онбординг новичка
+----------------------------
+ID тест-кейса: D98-BEGINNER-ONBOARD-001
+Шаги:
+1) Сброс рана или новый профиль, Ctrl+F5.
+2) `mssim._test.runOnboardingSmoke()`.
+Ожидаемый результат:
+- Блок «Что делать сейчас» с шагом 1 и кнопкой «Стартовая закупка».
+- `getBeginnerTier()` растёт 1→2→3 по мере игры.
+
 Шаблон для следующих дней
 -------------------------
 День XX - <название доработки>

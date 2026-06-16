@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#121318"/>
+  <text x="80" y="100" fill="#7a4cff" font-family="Arial,sans-serif" font-size="36" font-weight="700">Склад и закупки</text>
+  <rect x="80" y="140" width="1120" height="400" rx="12" fill="#1b1d25" stroke="#2b2e3a"/>
+  <text x="120" y="200" fill="#a9acb7" font-family="Arial,sans-serif" font-size="22">SKU · Остаток · Цена · Качество</text>
+  <text x="120" y="260" fill="#e7e7ea" font-family="Arial,sans-serif" font-size="20">lip-balm-01 · 420 · 890 ₽ · 85</text>
+  <text x="120" y="310" fill="#e7e7ea" font-family="Arial,sans-serif" font-size="20">serum-vit-c · 180 · 1 290 ₽ · 90</text>
+  <text x="640" y="650" text-anchor="middle" fill="#a9acb7" font-family="Arial,sans-serif" font-size="20">Screenshot placeholder — Stock</text>
+</svg>

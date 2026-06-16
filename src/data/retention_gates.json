@@ -1,0 +1,6 @@
+{
+  "maxOpenMajorBugs": 5,
+  "proxyD1ReturnMinPct": 30,
+  "firstRunCompletionMinPct": 75,
+  "minCohortVisitsForRate": 3
+}
