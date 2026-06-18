@@ -1,3 +1,5 @@
+import { STOCKOUT_NOUN } from "./playerLabels.js";
+
 /**
  * Активные KPI-алерты для панели QoL (фаза 4).
  * @param {object} state
@@ -19,14 +21,14 @@ export function getKpiAlerts(state) {
     alerts.push({
       id: "alert_stockout",
       severity: "high",
-      title: "Высокий stockout",
+      title: `Высокий ${STOCKOUT_NOUN}`,
       text: `${(Number(k.stockoutRate) * 100).toFixed(0)}% спроса не закрыто — пополните остатки.`,
     });
   } else if (Number(k.stockoutRate) > 0.08) {
     alerts.push({
       id: "alert_stockout_watch",
       severity: "medium",
-      title: "Stockout растёт",
+      title: "Растёт дефицит на складе",
       text: `${(Number(k.stockoutRate) * 100).toFixed(0)}% — планируйте дозаказ.`,
     });
   }
@@ -60,7 +62,7 @@ export function getKpiAlerts(state) {
       id: "alert_service",
       severity: "high",
       title: "Просадка сервиса",
-      text: `Рейтинг ${sr.toFixed(2)} — снизьте stockout и возвраты.`,
+      text: `Рейтинг ${sr.toFixed(2)} — снизьте дефицит на складе и возвраты.`,
     });
   }
 

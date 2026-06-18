@@ -2,9 +2,9 @@
   "version": "0.9.0-rc1",
   "phase": 5,
   "mode": "release",
-  "builtAt": "2026-06-16T22:03:51.930Z",
-  "totalBytes": 3526338,
-  "fileCount": 53,
+  "builtAt": "2026-06-18T21:29:35.936Z",
+  "totalBytes": 3650574,
+  "fileCount": 67,
   "files": [
     {
       "path": "dist/assets/store/cover-hero-1560x520.png",
@@ -20,11 +20,11 @@
     },
     {
       "path": "dist/src/app.js",
-      "bytes": 216230
+      "bytes": 229124
     },
     {
       "path": "dist/index.html",
-      "bytes": 28749
+      "bytes": 62064
     },
     {
       "path": "dist/src/data/skus_v3.json",
@@ -35,12 +35,36 @@
       "bytes": 10936
     },
     {
+      "path": "dist/src/core/cryptoExchangeModel.js",
+      "bytes": 10854
+    },
+    {
+      "path": "dist/src/data/tutorial_steps.json",
+      "bytes": 10791
+    },
+    {
+      "path": "dist/src/platform/cryptoOverlay.js",
+      "bytes": 10702
+    },
+    {
       "path": "dist/src/core/daySim.js",
-      "bytes": 9163
+      "bytes": 8904
+    },
+    {
+      "path": "dist/src/data/progression_nodes.json",
+      "bytes": 8190
+    },
+    {
+      "path": "dist/src/platform/tutorialSpotlight.js",
+      "bytes": 7638
     },
     {
       "path": "dist/src/data/skus_phase2.json",
       "bytes": 7380
+    },
+    {
+      "path": "dist/src/platform/gameMenu.js",
+      "bytes": 7271
     },
     {
       "path": "dist/src/core/retentionModel.js",
@@ -51,10 +75,6 @@
       "bytes": 7194
     },
     {
-      "path": "dist/src/data/progression_nodes.json",
-      "bytes": 7136
-    },
-    {
       "path": "dist/src/persistence/cloudSave.js",
       "bytes": 7086
     },
@@ -63,16 +83,28 @@
       "bytes": 6798
     },
     {
+      "path": "dist/src/core/balanceModel.js",
+      "bytes": 6603
+    },
+    {
       "path": "dist/src/core/softLaunchModel.js",
       "bytes": 6457
     },
     {
-      "path": "dist/src/core/balanceModel.js",
-      "bytes": 6294
+      "path": "dist/src/core/firstRunTutorial.js",
+      "bytes": 6113
+    },
+    {
+      "path": "dist/src/platform/playerUi.js",
+      "bytes": 5543
     },
     {
       "path": "dist/src/core/progressionModel.js",
-      "bytes": 5216
+      "bytes": 5496
+    },
+    {
+      "path": "dist/src/core/cardQualityModel.js",
+      "bytes": 5328
     },
     {
       "path": "dist/src/core/antiExploit.js",
@@ -83,10 +115,6 @@
       "bytes": 4937
     },
     {
-      "path": "dist/src/platform/playerUi.js",
-      "bytes": 4804
-    },
-    {
       "path": "dist/src/core/storeListingModel.js",
       "bytes": 4766
     },
@@ -95,16 +123,20 @@
       "bytes": 4548
     },
     {
-      "path": "dist/src/core/firstRunTutorial.js",
-      "bytes": 3833
+      "path": "dist/src/data/sku_names_ru.json",
+      "bytes": 3600
     },
     {
       "path": "dist/src/data/store_listing.json",
       "bytes": 3593
     },
     {
+      "path": "dist/src/platform/upgradesOverlay.js",
+      "bytes": 3487
+    },
+    {
       "path": "dist/src/data/build_manifest.json",
-      "bytes": 3456
+      "bytes": 3460
     },
     {
       "path": "dist/src/data/skus_beauty_m1.json",
@@ -112,59 +144,27 @@
     },
     {
       "path": "dist/src/core/beginnerUiModel.js",
-      "bytes": 3210
+      "bytes": 3218
+    },
+    {
+      "path": "dist/src/platform/gameTooltip.js",
+      "bytes": 3195
+    },
+    {
+      "path": "dist/src/data/crypto_assets.json",
+      "bytes": 3113
+    },
+    {
+      "path": "dist/src/platform/dayTransition.js",
+      "bytes": 2845
     },
     {
       "path": "dist/src/core/kpiAlertsModel.js",
-      "bytes": 2542
+      "bytes": 2650
     },
     {
-      "path": "dist/src/data/events_phase2.json",
-      "bytes": 2468
-    },
-    {
-      "path": "dist/src/core/automationModel.js",
-      "bytes": 2361
-    },
-    {
-      "path": "dist/src/core/buildModel.js",
-      "bytes": 1982
-    },
-    {
-      "path": "dist/src/platform/browserCompat.js",
-      "bytes": 1939
-    },
-    {
-      "path": "dist/src/platform/yandexSdk.js",
-      "bytes": 1895
-    },
-    {
-      "path": "dist/src/data/soft_launch_config.json",
-      "bytes": 1518
-    },
-    {
-      "path": "dist/src/data/play_styles.json",
-      "bytes": 1303
-    },
-    {
-      "path": "dist/src/core/demandModel.js",
-      "bytes": 1250
-    },
-    {
-      "path": "dist/src/data/categories.json",
-      "bytes": 1246
-    },
-    {
-      "path": "dist/assets/store/screenshot-kpi.svg",
-      "bytes": 1070
-    },
-    {
-      "path": "dist/assets/store/screenshot-progression.svg",
-      "bytes": 947
-    },
-    {
-      "path": "dist/assets/store/screenshot-stock.svg",
-      "bytes": 927
+      "path": "dist/src/platform/gameToast.js",
+      "bytes": 2530
     }
   ]
 }

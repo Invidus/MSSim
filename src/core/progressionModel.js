@@ -1,5 +1,6 @@
 /** @typedef {{ id: string; branch?: string; title?: string; desc?: string; cost?: number; cashCost?: number; dailySalary?: number; requires?: string[]; effect?: Record<string, unknown> }} ProgressionNode */
 
+import { scoreAtOrAboveFloor, snapQualityScore, DEFAULT_QUALITY_SCORE } from "./cardQualityModel.js";
 export function defaultProgressionModifiers() {
   return {
     adEfficiencyMult: 1,
@@ -19,8 +20,18 @@ export function defaultProgressionModifiers() {
     forecastAccuracyBonus: 0,
     autoReprice: false,
     autoReorder: false,
+    cryptoExchange: false,
     activeSynergies: [],
   };
+}
+
+export const CRYPTO_EXCHANGE_NODE_ID = "n35";
+
+/**
+ * @param {object} state
+ */
+export function isCryptoExchangeUnlocked(state) {
+  return state?.progressionUnlocked?.[CRYPTO_EXCHANGE_NODE_ID] === true;
 }
 
 /**
@@ -103,6 +114,7 @@ function mergeEffectIntoMods(mods, effect) {
   if (effect.forecastAccuracyBonus) mods.forecastAccuracyBonus += Number(effect.forecastAccuracyBonus) || 0;
   if (effect.autoReprice) mods.autoReprice = true;
   if (effect.autoReorder) mods.autoReorder = true;
+  if (effect.cryptoExchange) mods.cryptoExchange = true;
 }
 
 /**
@@ -125,11 +137,11 @@ export function computeTeamDailySalary(state, nodes) {
  * @param {ProgressionNode[]} nodes
  */
 export function applyQualityFloor(state, qualityFloor) {
-  const floor = Math.max(0, Math.round(Number(qualityFloor) || 0));
-  if (!floor || !state?.skus) return;
+  const target = scoreAtOrAboveFloor(qualityFloor);
+  if (!target || !state?.skus) return;
   for (const sku of state.skus) {
     const id = sku.id;
-    const current = Number(state.qualityScore?.[id]) || 72;
-    state.qualityScore[id] = Math.max(current, floor);
+    const current = snapQualityScore(Number(state.qualityScore?.[id]) || DEFAULT_QUALITY_SCORE);
+    state.qualityScore[id] = Math.max(current, target);
   }
 }

@@ -63,16 +63,16 @@ export function applyBeginnerUi(tier, isDev = false) {
     teaser.hidden = !showTeaser;
     teaser.style.display = showTeaser ? "" : "none";
   }
-  setTutorialChrome(false, 0);
+  setTutorialChrome(false, 0, {});
 }
 
 /**
- * Режим обучения первого запуска — видны только 1–2 блока за раз.
- * @param {1|2|3} step
+ * Режим обучения — видны только нужные блоки + подсветка в chrome.
+ * @param {number} step
  * @param {string[]} visibleSections
- * @param {boolean} [highlightNextDay]
+ * @param {{ highlightNextDay?: boolean; hideBuyManual?: boolean; hideReset?: boolean }} [chrome]
  */
-export function applyTutorialUi(step, visibleSections, highlightNextDay = false) {
+export function applyTutorialUi(step, visibleSections, chrome = {}) {
   if (typeof document === "undefined") return;
   const allowed = new Set(visibleSections);
   document.body.dataset.tutorialActive = "1";
@@ -101,22 +101,35 @@ export function applyTutorialUi(step, visibleSections, highlightNextDay = false)
     teaser.style.display = "none";
   }
 
-  setTutorialChrome(true, step, highlightNextDay);
+  setTutorialChrome(true, step, chrome);
 }
 
 /**
  * @param {boolean} active
  * @param {number} step
- * @param {boolean} [highlightNextDay]
+ * @param {{ highlightNextDay?: boolean; hideBuyManual?: boolean; hideReset?: boolean }} chrome
  */
-function setTutorialChrome(active, step, highlightNextDay = false) {
+function setTutorialChrome(active, step, chrome = {}) {
+  const highlightNextDay = chrome.highlightNextDay === true;
+  const hideBuyManual = chrome.hideBuyManual === true;
+  const hideReset = chrome.hideReset !== false && step <= 5;
+  const allowNextDay = !active || highlightNextDay;
+
   const nextBtn = document.getElementById("nextDayBtn");
-  if (nextBtn instanceof HTMLElement) {
+  if (nextBtn instanceof HTMLButtonElement) {
+    nextBtn.disabled = !allowNextDay;
     nextBtn.classList.toggle("tutorial-highlight", active && highlightNextDay);
+    nextBtn.classList.toggle("tutorial-locked", active && !highlightNextDay);
   }
-  const resetBtn = document.getElementById("resetBtn");
-  if (resetBtn instanceof HTMLElement) {
-    resetBtn.hidden = active && step <= 2;
+  const upgradesBtn = document.getElementById("upgradesBtn");
+  if (upgradesBtn instanceof HTMLButtonElement) {
+    upgradesBtn.disabled = active;
+    upgradesBtn.classList.toggle("tutorial-locked", active);
+  }
+  const menuResetBtn = document.getElementById("gameMenuResetBtn");
+  if (menuResetBtn instanceof HTMLElement) {
+    menuResetBtn.hidden = active && hideReset;
+    menuResetBtn.style.display = active && hideReset ? "none" : "";
   }
   const showAll = document.getElementById("showAllSectionsBtn");
   if (showAll instanceof HTMLElement) {
@@ -125,8 +138,8 @@ function setTutorialChrome(active, step, highlightNextDay = false) {
   }
   const buyManual = document.getElementById("buyManualRow");
   if (buyManual instanceof HTMLElement) {
-    buyManual.hidden = active && step === 1;
-    buyManual.style.display = active && step === 1 ? "none" : "";
+    buyManual.hidden = active && hideBuyManual;
+    buyManual.style.display = active && hideBuyManual ? "none" : "";
   }
   const skipTutorial = document.getElementById("skipTutorialBtn");
   if (skipTutorial instanceof HTMLElement) {

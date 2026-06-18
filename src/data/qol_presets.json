@@ -28,7 +28,7 @@
   {
     "id": "qol_recovery",
     "label": "Safe recovery v2",
-    "desc": "Anti-stockout пресет",
+    "desc": "Пресет против дефицита на складе",
     "action": "safe_recovery"
   }
 ]

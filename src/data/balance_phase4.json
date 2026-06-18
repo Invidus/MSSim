@@ -1,8 +1,9 @@
 {
   "returns": {
-    "qualityReference": 52,
+    "qualityReference": 48,
     "qualitySpan": 38,
     "qualityReturnFloor": 0.68,
+    "qualityReturnCeil": 1.1,
     "playerLeverageMinReduction": 0.3,
     "optimizedQuality": 90,
     "optimizedReturnRateMod": 0.9,

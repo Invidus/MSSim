@@ -79,7 +79,7 @@ export function simulateSalesDay(state, cfg) {
       Number(eventMods.marketPriceMultByCategory?.[catId]) ||
       1;
     const marketPrice = sku.recommendedPrice * marketPriceMult;
-    const qualityScore = state.qualityScore[skuId] ?? 65;
+    const qualityScore = state.qualityScore[skuId] ?? 35;
     const promoMod = state.promoOn[skuId] ? 1.12 : 1;
 
     const catMod = categoryModById.get(catId) || 1;

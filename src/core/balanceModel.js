@@ -1,8 +1,9 @@
 const DEFAULT_BALANCE = {
   returns: {
-    qualityReference: 52,
+    qualityReference: 48,
     qualitySpan: 38,
     qualityReturnFloor: 0.68,
+    qualityReturnCeil: 1.1,
     playerLeverageMinReduction: 0.3,
     optimizedQuality: 90,
     optimizedReturnRateMod: 0.9,
@@ -38,16 +39,22 @@ export function normalizeBalanceConfig(raw) {
 
 /**
  * Качество карточки снижает долю возвратов (фаза 4 баланс).
+ * Ниже референса — штраф к возвратам; выше — бонус.
  * @param {number} qualityScore
  * @param {object} [cfg]
  */
 export function computeQualityReturnFactor(qualityScore, cfg = DEFAULT_BALANCE.returns) {
-  const q = Math.max(0, Math.min(100, Number(qualityScore) || 65));
-  const ref = Number(cfg.qualityReference) || 52;
+  const q = Math.max(0, Math.min(100, Number(qualityScore) || 35));
+  const ref = Number(cfg.qualityReference) || 48;
   const span = Math.max(1, Number(cfg.qualitySpan) || 38);
   const floor = Math.max(0.5, Math.min(1, Number(cfg.qualityReturnFloor) || 0.68));
-  const t = Math.max(0, Math.min(1, (q - ref) / span));
-  return 1 - (1 - floor) * t;
+  const ceil = Math.max(1, Number(cfg.qualityReturnCeil) || 1.1);
+  if (q >= ref) {
+    const t = Math.max(0, Math.min(1, (q - ref) / span));
+    return 1 - (1 - floor) * t;
+  }
+  const tBelow = Math.max(0, Math.min(1, (ref - q) / span));
+  return 1 + (ceil - 1) * tBelow;
 }
 
 /**
@@ -58,7 +65,7 @@ export function computeQualityReturnFactor(qualityScore, cfg = DEFAULT_BALANCE.r
 export function computeSkuReturnRate(sku, opts, balanceCfg = DEFAULT_BALANCE) {
   const retCfg = balanceCfg.returns || DEFAULT_BALANCE.returns;
   const base = Math.max(0, Number(sku?.baseReturnRate) || 0);
-  const qFactor = computeQualityReturnFactor(opts.qualityScore ?? 65, retCfg);
+  const qFactor = computeQualityReturnFactor(opts.qualityScore ?? 35, retCfg);
   const mod = Math.max(0, Number(opts.returnRateMod) || 1);
   const ev = Math.max(0, Number(opts.eventMult) || 1);
   const prog = Math.max(0, Number(opts.progressionMult) || 1);
@@ -78,7 +85,7 @@ export function auditReturnsLeverage(state, balanceCfg = DEFAULT_BALANCE) {
   };
   const baseline = computeSkuReturnRate(
     sku,
-    { qualityScore: 65, returnRateMod: 1, eventMult: 1, progressionMult: 1 },
+    { qualityScore: 35, returnRateMod: 1, eventMult: 1, progressionMult: 1 },
     balanceCfg
   );
   const optimized = computeSkuReturnRate(

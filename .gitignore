@@ -14,5 +14,8 @@ Thumbs.db
 .env
 .env.*
 
+# Personal project map (not for repo)
+remember
+
 # Markdown (design docs — не в репозитории)
 *.md
