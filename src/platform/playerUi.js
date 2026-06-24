@@ -66,6 +66,9 @@ export function applyBeginnerUi(tier, isDev = false) {
   setTutorialChrome(false, 0, {});
 }
 
+/** Блоки сайдбара, видимые на всех шагах обучения */
+const TUTORIAL_SIDEBAR_ALWAYS = new Set(["summary", "incoming"]);
+
 /**
  * Режим обучения — видны только нужные блоки + подсветка в chrome.
  * @param {number} step
@@ -75,6 +78,7 @@ export function applyBeginnerUi(tier, isDev = false) {
 export function applyTutorialUi(step, visibleSections, chrome = {}) {
   if (typeof document === "undefined") return;
   const allowed = new Set(visibleSections);
+  for (const id of TUTORIAL_SIDEBAR_ALWAYS) allowed.add(id);
   document.body.dataset.tutorialActive = "1";
   document.body.dataset.tutorialStep = String(step);
   document.body.dataset.beginnerTier = "1";
@@ -89,6 +93,7 @@ export function applyTutorialUi(step, visibleSections, chrome = {}) {
 
   for (const el of document.querySelectorAll("[data-beginner-min]")) {
     if (!(el instanceof HTMLElement)) continue;
+    if (el.classList.contains("store-sidebar")) continue;
     const sectionId = el.getAttribute("data-ui-section") || "";
     if (sectionId && allowed.has(sectionId)) continue;
     el.hidden = true;

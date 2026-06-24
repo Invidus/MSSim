@@ -3,21 +3,49 @@
     "id": "syn_growth_flywheel",
     "title": "Синергия роста",
     "requires": ["n7", "n9"],
-    "desc": "Трафик + конверсия: +5% adEfficiency и +3% conversion",
+    "desc": "Трафик + конверсия: +5% эффективности рекламы и +3% конверсии",
     "effect": { "adEfficiencyMult": 1.05, "baseConversionMult": 1.03 }
   },
   {
     "id": "syn_ops_quality",
     "title": "Синергия качества операций",
     "requires": ["n8", "n6"],
-    "desc": "Операции + качество: -0.2 п.п. feeRate и -4% returns cost",
+    "desc": "Операции + качество: −0.2 п.п. комиссии и −4% расходов на возвраты",
     "effect": { "feeRateDelta": -0.002, "returnHandlingCostMult": 0.96 }
   },
   {
     "id": "syn_full_stack",
     "title": "Сквозная синергия",
     "requires": ["n10", "n11", "n12"],
-    "desc": "Полный контур: +4% conversion и -3% outbound",
+    "desc": "Полный контур: +4% конверсии и −3% исходящей логистики",
     "effect": { "baseConversionMult": 1.04, "outboundCostMult": 0.97 }
+  },
+  {
+    "id": "syn_commerce_brand",
+    "title": "Сила бренда",
+    "requires": ["n17", "n18"],
+    "desc": "Коммерция: +3% органики и +0.06 к рейтингу сервиса",
+    "effect": { "organicGlobalMult": 1.03, "serviceRatingDelta": 0.06 }
+  },
+  {
+    "id": "syn_team_engine",
+    "title": "Слаженная машина",
+    "requires": ["n26", "n12"],
+    "desc": "Команда + омниканал: +6% эффектов команды",
+    "effect": { "teamEffectMult": 1.06 }
+  },
+  {
+    "id": "syn_automation_loop",
+    "title": "Автопилот закупок",
+    "requires": ["n30", "n31"],
+    "desc": "Автоматизация: +4% прибыли",
+    "effect": { "globalProfitMult": 1.04 }
+  },
+  {
+    "id": "syn_control_room",
+    "title": "Диспетчерская",
+    "requires": ["n34", "n21"],
+    "desc": "Прогноз + Control Tower: −12% урона от событий",
+    "effect": { "eventDamageMult": 0.88 }
   }
 ]

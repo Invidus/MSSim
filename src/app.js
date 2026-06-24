@@ -1,9 +1,10 @@
-﻿import { simulateSalesDay } from "./core/daySim.js";
+import { simulateSalesDay } from "./core/daySim.js";
 import { clamp } from "./core/demandModel.js";
 import {
   getProgressionModifiers,
   computeTeamDailySalary,
   applyQualityFloor,
+  repairLegacyQualityFloorBug,
   isCryptoExchangeUnlocked,
   CRYPTO_EXCHANGE_NODE_ID,
 } from "./core/progressionModel.js";
@@ -41,18 +42,7 @@ import {
   buildKpiChartPanels,
   renderKpiChartsHtml,
 } from "./core/kpiChartsModel.js";
-import {
-  isTutorialActive,
-  resolveTutorialStep,
-  canAdvanceDayDuringTutorial,
-  tutorialVisibleSections,
-  getTutorialContent,
-  syncTutorialCompletion,
-  migrateTutorialFlags,
-  advanceTutorialBeat,
-  prepareTutorialRestart,
-  setTutorialSteps,
-} from "./core/firstRunTutorial.js";
+import { isTutorialActive, resolveTutorialStep, canAdvanceDayDuringTutorial, tutorialVisibleSections, getTutorialContent, syncTutorialCompletion, migrateTutorialFlags, advanceTutorialBeat, prepareTutorialRestart, setTutorialSteps } from "./core/firstRunTutorial.js";
 import { getKpiAlerts } from "./core/kpiAlertsModel.js";
 import {
   normalizeBalanceConfig,
@@ -89,6 +79,7 @@ import {
   defaultRetentionCohort,
 } from "./core/retentionModel.js";
 import { runBrowserCompatChecks, applyReleaseUiMode } from "./platform/browserCompat.js";
+import { renderSkuThumbHtml, qualityRingColor } from "./core/skuThumbModel.js";
 import { applyBeginnerUi, applyTutorialUi } from "./platform/playerUi.js";
 import {
   renderTutorialSpotlight,
@@ -101,12 +92,48 @@ import {
   createEmptyCryptoState,
   normalizeCryptoState,
   advanceCryptoMarket,
+  getCryptoPortfolioSummary,
 } from "./core/cryptoExchangeModel.js";
 import { initCryptoOverlay, isCryptoOverlayOpen, renderCryptoOverlay } from "./platform/cryptoOverlay.js";
+import {
+  normalizeLuxuryCatalog,
+  normalizeLuxuryState,
+  createEmptyLuxuryState,
+  isLuxuryShopUnlocked,
+  luxuryBuyErrorMessage,
+  luxurySellErrorMessage,
+} from "./core/luxuryAssetsModel.js";
+import {
+  initLuxuryOverlay,
+  isLuxuryOverlayOpen,
+  renderLuxuryOverlay,
+} from "./platform/luxuryOverlay.js";
 import { playDayTransition, isDayTransitionPlaying } from "./platform/dayTransition.js";
 import { initGameMenu, showGameConfirm } from "./platform/gameMenu.js";
 import { initGameTooltips } from "./platform/gameTooltip.js";
-import { toastError, toastWarn, toastSuccess, toastInfo } from "./platform/gameToast.js";
+import { toastError, toastWarn, toastSuccess, toastInfo, showGameToast } from "./platform/gameToast.js";
+import { addIncomingShipment, consolidateIncomingShipments } from "./core/incomingShipmentModel.js";
+import { initAchievementsOverlay, isAchievementsOverlayOpen, renderAchievementsOverlay } from "./platform/achievementsOverlay.js";
+import { enqueueAchievementPopups } from "./platform/achievementPopup.js";
+import {
+  setAchievementCatalog,
+  evaluateAchievements,
+} from "./core/achievementModel.js";
+import {
+  isSimpleQuestActive,
+  isQuestCompleted,
+  getQuestStepContent,
+  advanceQuestStep,
+  completeSimpleQuest,
+  questBeginnerTierCap,
+  shouldUseSimpleKpi,
+  resolveQuestStepIndex,
+  syncQuestRewards,
+  hasQuestTuneChange,
+  ensureQuestTuneBaseline,
+} from "./core/questModel.js";
+import { getShopName, normalizeShopName, hasCustomShopName, needsShopNamePrompt, markShopNamePromptDone, isShopNameLocked } from "./core/storeIdentityModel.js";
+import { initShopNameWelcome, openShopNameWelcome, closeShopNameWelcome, isShopNameWelcomeOpen } from "./platform/shopNameWelcome.js";
 import {
   STOCKOUT_NOUN,
   STOCKOUT_RATE,
@@ -130,15 +157,15 @@ import {
   CLOUD_MOCK_KEY,
   hasCloudMockSave,
 } from "./persistence/cloudSave.js";
-import { initYandexSdk, bindAccountSelectionHandlers, refreshYandexPlayer } from "./platform/yandexSdk.js";
+import { initYandexSdk, bindAccountSelectionHandlers, refreshYandexPlayer, signalYandexGameReady, startYandexGameplay, stopYandexGameplay } from "./platform/yandexSdk.js";
 
 const defaultCategories = [
-  { id: "beauty", name: "Beauty and Care", baseDemandMod: 1.15, baseMarginMod: 0.32, baseReturnRate: 0.07, volatility: 0.12 },
-  { id: "home", name: "Home and Kitchen", baseDemandMod: 1.0, baseMarginMod: 0.28, baseReturnRate: 0.06, volatility: 0.1 },
-  { id: "kids", name: "Kids and Toys", baseDemandMod: 0.95, baseMarginMod: 0.3, baseReturnRate: 0.09, volatility: 0.18 },
-  { id: "apparel", name: "Apparel and Basics", baseDemandMod: 1.2, baseMarginMod: 0.35, baseReturnRate: 0.16, volatility: 0.22 },
-  { id: "pet", name: "Pet Supplies", baseDemandMod: 0.9, baseMarginMod: 0.26, baseReturnRate: 0.05, volatility: 0.08 },
-  { id: "electronics", name: "Gadgets and Accessories", baseDemandMod: 1.05, baseMarginMod: 0.33, baseReturnRate: 0.1, volatility: 0.2 },
+  { id: "beauty", name: "Красота и уход", baseDemandMod: 1.15, baseMarginMod: 0.32, baseReturnRate: 0.07, volatility: 0.12 },
+  { id: "home", name: "Дом и кухня", baseDemandMod: 1.0, baseMarginMod: 0.28, baseReturnRate: 0.06, volatility: 0.1 },
+  { id: "kids", name: "Дети и игрушки", baseDemandMod: 0.95, baseMarginMod: 0.3, baseReturnRate: 0.09, volatility: 0.18 },
+  { id: "apparel", name: "Одежда и базовые вещи", baseDemandMod: 1.2, baseMarginMod: 0.35, baseReturnRate: 0.16, volatility: 0.22 },
+  { id: "pet", name: "Товары для животных", baseDemandMod: 0.9, baseMarginMod: 0.26, baseReturnRate: 0.05, volatility: 0.08 },
+  { id: "electronics", name: "Гаджеты и аксессуары", baseDemandMod: 1.05, baseMarginMod: 0.33, baseReturnRate: 0.1, volatility: 0.2 },
 ];
 
 const defaultSkus = [
@@ -179,6 +206,8 @@ const SERVICE_CAUSE_HISTORY_DAYS = 7;
 const PROGRESSION_POINT_PER_DAY = 1;
 const CRYPTO_LOCKED_TIP =
   "Сначала изучите улучшение «Криптобиржа» в окне «Улучшения».";
+const LUXURY_LOCKED_TIP =
+  "Откроется после 3-го дня симуляции — когда бизнес уже приносит первые результаты.";
 const DEFAULT_PROGRESSION_NODES_FALLBACK = [
   { id: "n1", branch: "marketing", title: "Трафик I", desc: "+8% adEfficiency", cost: 1, cashCost: 5000, requires: [], effect: { adEfficiencyMult: 1.08 } },
   { id: "n2", branch: "operations", title: "Комиссия I", desc: "-0.4 п.п. feeRate", cost: 1, cashCost: 5000, requires: [], effect: { feeRateDelta: -0.004 } },
@@ -215,12 +244,42 @@ const DEFAULT_PROGRESSION_SYNERGIES_FALLBACK = [
     desc: "Полный контур: +4% conversion и -3% outbound",
     effect: { baseConversionMult: 1.04, outboundCostMult: 0.97 },
   },
+  {
+    id: "syn_commerce_brand",
+    title: "Сила бренда",
+    requires: ["n17", "n18"],
+    desc: "Коммерция: +3% organic и +0.06 service rating",
+    effect: { organicGlobalMult: 1.03, serviceRatingDelta: 0.06 },
+  },
+  {
+    id: "syn_team_engine",
+    title: "Слаженная машина",
+    requires: ["n26", "n12"],
+    desc: "Команда + омниканал: +6% team effects",
+    effect: { teamEffectMult: 1.06 },
+  },
+  {
+    id: "syn_automation_loop",
+    title: "Автопилот закупок",
+    requires: ["n30", "n31"],
+    desc: "Автоматизация: +4% profit",
+    effect: { globalProfitMult: 1.04 },
+  },
+  {
+    id: "syn_control_room",
+    title: "Диспетчерская",
+    requires: ["n34", "n21"],
+    desc: "Прогноз + Control Tower: -12% event damage",
+    effect: { eventDamageMult: 0.88 },
+  },
 ];
 let progressionNodes = [];
 let progressionSynergies = [];
 let playStyles = [];
 /** @type {import("./core/cryptoExchangeModel.js").CryptoAssetDef[]} */
 let cryptoAssets = [];
+/** @type {import("./core/luxuryAssetsModel.js").LuxuryItemDef[]} */
+let luxuryCatalog = [];
 let onboardingSteps = [];
 let qolPresets = [];
 let balancePhase4 = normalizeBalanceConfig(null);
@@ -276,6 +335,15 @@ let platformState = {
   player: null,
   message: "Проверка SDK…",
 };
+let yandexBootFinalized = false;
+
+function finalizeYandexGameBoot() {
+  if (yandexBootFinalized) return;
+  yandexBootFinalized = true;
+  if (!platformState?.available || !platformState.sdk) return;
+  signalYandexGameReady(platformState.sdk);
+  startYandexGameplay(platformState.sdk);
+}
 /** @type {{ label: string; load: () => Promise<object | null>; save: (state: object, flush?: boolean) => Promise<{ ok: boolean }>; clear: () => Promise<{ ok: boolean }> } | null} */
 let cloudAdapter = null;
 let cloudSyncPaused = false;
@@ -326,7 +394,8 @@ const els = {
   hideOnboardingBtn: document.getElementById("hideOnboardingBtn"),
   showAllSectionsBtn: document.getElementById("showAllSectionsBtn"),
   skipTutorialBtn: document.getElementById("skipTutorialBtn"),
-  quickStartBtn: document.getElementById("quickStartBtn"),
+  quickStartBtn: null,
+  buySkuPreview: document.getElementById("buySkuPreview"),
   kpiAlertsPanel: document.getElementById("kpiAlertsPanel"),
   skuStockFilterSelect: document.getElementById("skuStockFilterSelect"),
   skuSearchInput: document.getElementById("skuSearchInput"),
@@ -356,6 +425,13 @@ const els = {
   summary: document.getElementById("summary"),
   serviceRating: document.getElementById("serviceRating"),
   serviceDiagnostics: document.getElementById("serviceDiagnostics"),
+  serviceDiagnosticsToggle: document.getElementById("serviceDiagnosticsToggle"),
+  serviceDiagnosticsWrap: document.getElementById("serviceDiagnosticsWrap"),
+  shopNameInput: document.getElementById("shopNameInput"),
+  shopNameDisplay: document.getElementById("shopNameDisplay"),
+  incomingSidebarList: document.getElementById("incomingSidebarList"),
+  questSidebarPanel: document.getElementById("questSidebarPanel"),
+  appTagline: document.getElementById("appTagline"),
   importServiceDiagBaseBtn: document.getElementById("importServiceDiagBaseBtn"),
   importServiceDiagCandBtn: document.getElementById("importServiceDiagCandBtn"),
   clearServiceDiagCompareBtn: document.getElementById("clearServiceDiagCompareBtn"),
@@ -386,11 +462,9 @@ const els = {
   qtyInput: document.getElementById("qtyInput"),
   buyBtn: document.getElementById("buyBtn"),
   buyHint: document.getElementById("buyHint"),
-  incomingList: document.getElementById("incomingList"),
-  morningArrivals: document.getElementById("morningArrivals"),
-  stockTable: document.getElementById("stockTable"),
   adBudgetRange: document.getElementById("adBudgetRange"),
   adBudgetLabel: document.getElementById("adBudgetLabel"),
+  adBudgetField: document.getElementById("adBudgetField"),
   adEnabledToggle: document.getElementById("adEnabledToggle"),
   feeRateInput: document.getElementById("feeRateInput"),
   paymentRateInput: document.getElementById("paymentRateInput"),
@@ -400,7 +474,6 @@ const els = {
   returnRateModRange: document.getElementById("returnRateModRange"),
   returnRateModLabel: document.getElementById("returnRateModLabel"),
   merchRoot: document.getElementById("merchRoot"),
-  yesterdayReport: document.getElementById("yesterdayReport"),
   costBreakdown: document.getElementById("costBreakdown"),
   deadlockStatus: document.getElementById("deadlockStatus"),
   rescueBtn: document.getElementById("rescueBtn"),
@@ -410,6 +483,8 @@ const serviceDiagCompareState = {
   baseline: null,
   candidate: null,
 };
+
+let serviceDiagHintsOpen = false;
 
 function emptyProgressionUnlocked() {
   return Object.fromEntries(progressionNodes.map((n) => [n.id, false]));
@@ -461,7 +536,7 @@ function refreshDerivedModifiers(state = gameState) {
   };
   state.eventModifiers = softenEventModifiers(state.eventModifiers || defaultEventModifiers(), prog.eventDamageMult);
   state.teamDailyCost = computeTeamDailySalary(state, progressionNodes);
-  if (prog.qualityFloorDelta > 0) applyQualityFloor(state, 52 + prog.qualityFloorDelta);
+  if (prog.qualityFloorDelta > 0) applyQualityFloor(state, DEFAULT_QUALITY_SCORE + prog.qualityFloorDelta);
 }
 
 function buildSimulationConstants(state = gameState) {
@@ -523,6 +598,7 @@ function unlockProgressionNode(nodeId) {
   gameState.progressionPoints = Math.max(0, (gameState.progressionPoints || 0) - spCost);
   gameState.progressionUnlocked[node.id] = true;
   refreshDerivedModifiers();
+  runAchievementCheck();
   if (node.id === CRYPTO_EXCHANGE_NODE_ID) {
     toastSuccess("Криптобиржа открыта — кнопка ₿ в шапке теперь активна.");
   }
@@ -535,7 +611,9 @@ function renderProgressionContent(metaEl, panelEl, { animateCards = false } = {}
   const unlockedCount = progressionNodes.filter((n) => gameState.progressionUnlocked?.[n.id]).length;
   const mods = getProgressionModifiers(gameState, progressionNodes, progressionSynergies);
   const teamSalary = computeTeamDailySalary(gameState, progressionNodes);
-  metaEl.innerHTML = `На счёте: <b>${money(gameState.cash)}</b> · Очки прогрессии: <b>${gameState.progressionPoints || 0}</b> ( +${PROGRESSION_POINT_PER_DAY}/день) · Узлов: <b>${unlockedCount}/${progressionNodes.length}</b> · Синергий: <b>${mods.activeSynergies.length}</b> · ЗП команды: <b>${money(teamSalary)}</b>/день · Бонусы: ad x${mods.adEfficiencyMult.toFixed(2)}, conv x${mods.baseConversionMult.toFixed(2)}, fee ${(mods.feeRateDelta * 100).toFixed(2)} п.п.<br/><span class="muted" style="font-size:12px">Каждое улучшение стоит очки прогрессии и деньги сразу при покупке.</span>`;
+  const synMeta =
+    mods.activeSynergies.length > 0 ? ` · Синергий: <b>${mods.activeSynergies.length}</b>` : "";
+  metaEl.innerHTML = `На счёте: <b>${money(gameState.cash)}</b> · Очки прогрессии: <b>${gameState.progressionPoints || 0}</b> ( +${PROGRESSION_POINT_PER_DAY}/день) · Узлов: <b>${unlockedCount}/${progressionNodes.length}</b>${synMeta} · ЗП команды: <b>${money(teamSalary)}</b>/день · Бонусы: реклама ×${mods.adEfficiencyMult.toFixed(2)}, конверсия ×${mods.baseConversionMult.toFixed(2)}, комиссия ${(mods.feeRateDelta * 100).toFixed(2)} п.п.<br/><span class="muted" style="font-size:12px">Каждое улучшение стоит очки прогрессии и деньги сразу при покупке.</span>`;
 
   const branchLabel = {
     marketing: "Маркетинг",
@@ -581,12 +659,22 @@ function renderProgressionContent(metaEl, panelEl, { animateCards = false } = {}
       <button type="button" class="btn-secondary js-prog-unlock" data-node-id="${n.id}" ${opened || !canOpen ? "disabled" : ""} style="margin-top:6px">${btnLabel}</button>
     </div>`;
   }).join("");
-  const synRows = mods.activeSynergies.length
-    ? mods.activeSynergies
-        .map((s) => `<li style="margin:4px 0"><span style="color:#8fd694"><b>${s.title}</b></span> — ${s.desc}</li>`)
-        .join("")
-    : `<li style="margin:4px 0" class="muted">Пока нет активных синергий — открой комбинации узлов из разных веток.</li>`;
-  panelEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px">${cards}</div><div style="margin-top:8px"><b>Активные синергии</b><ul class="incoming" style="margin-top:4px">${synRows}</ul></div>`;
+  const synSection = mods.activeSynergies.length
+    ? `<div class="upgrades-synergies-block">
+        <h3 class="upgrades-synergies-title">Активные синергии</h3>
+        <ul class="upgrades-synergies-list">
+          ${mods.activeSynergies
+            .map(
+              (s) => `<li class="upgrades-synergy-item">
+                <span class="upgrades-synergy-name">${s.title}</span>
+                <span class="upgrades-synergy-desc">${s.desc}</span>
+              </li>`
+            )
+            .join("")}
+        </ul>
+      </div>`
+    : "";
+  panelEl.innerHTML = `<div class="upgrades-cards-grid">${cards}</div>${synSection}`;
 }
 
 function renderProgressionPanel() {
@@ -604,6 +692,21 @@ function renderUpgradesOverlayContent() {
 function renderCryptoOverlayContent() {
   if (!gameState || !cryptoAssets.length) return;
   renderCryptoOverlay({ state: gameState, assets: cryptoAssets });
+}
+
+function renderLuxuryOverlayContent() {
+  if (!gameState || !luxuryCatalog.length) return;
+  renderLuxuryOverlay({ state: gameState, catalog: luxuryCatalog });
+}
+
+function repairLuxuryOwnedPrices(state) {
+  if (!state?.luxury?.owned || !luxuryCatalog.length) return;
+  const byId = new Map(luxuryCatalog.map((x) => [x.id, x]));
+  for (const [id, meta] of Object.entries(state.luxury.owned)) {
+    if (!meta || meta.price > 0) continue;
+    const def = byId.get(id);
+    if (def) meta.price = def.price;
+  }
 }
 
 function syncNextDayFabState() {
@@ -624,6 +727,25 @@ function syncCryptoBtnState() {
   btn.classList.toggle("tutorial-locked", !unlocked || tutorialOn);
   if (!unlocked) {
     wrap.setAttribute("data-tip", CRYPTO_LOCKED_TIP);
+    wrap.classList.add("game-tip");
+  } else {
+    wrap.removeAttribute("data-tip");
+    wrap.classList.remove("game-tip");
+  }
+}
+
+function syncLuxuryBtnState() {
+  const btn = document.getElementById("luxuryBtn");
+  const wrap = document.getElementById("luxuryBtnWrap");
+  if (!(btn instanceof HTMLButtonElement) || !(wrap instanceof HTMLElement)) return;
+  const unlocked = isLuxuryShopUnlocked(gameState);
+  const tutorialOn = isTutorialActive(gameState);
+  btn.disabled = !unlocked || tutorialOn;
+  wrap.classList.toggle("luxury-locked", !unlocked);
+  btn.classList.toggle("luxury-locked", !unlocked);
+  btn.classList.toggle("tutorial-locked", !unlocked || tutorialOn);
+  if (!unlocked) {
+    wrap.setAttribute("data-tip", LUXURY_LOCKED_TIP);
     wrap.classList.add("game-tip");
   } else {
     wrap.removeAttribute("data-tip");
@@ -723,6 +845,14 @@ function categoryById(id) {
 
 function getVisibleSkus() {
   if (!gameState?.skus) return [];
+  if (isPlayerUi()) {
+    return [...gameState.skus].sort((a, b) => {
+      const catA = categoryById(a.categoryId)?.name || a.categoryId || "";
+      const catB = categoryById(b.categoryId)?.name || b.categoryId || "";
+      if (catA !== catB) return catA.localeCompare(catB, "ru");
+      return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+    });
+  }
   let list = gameState.skus;
   if (gameState.selectedCategoryId) {
     const catList = list.filter((s) => s.categoryId === gameState.selectedCategoryId);
@@ -826,8 +956,7 @@ function purchase() {
   const arrivalDay = gameState.day + lead;
 
   gameState.cash -= totalCost;
-  gameState.incomingShipments.push({
-    id: `sh_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  addIncomingShipment(gameState, {
     skuId: String(skuId),
     qty,
     orderDay: gameState.day,
@@ -835,7 +964,34 @@ function purchase() {
     totalCost,
   });
 
+  runAchievementCheck();
+  applyQuestRewardPayouts();
+  autoSaveGame({ silent: true });
   render();
+}
+
+function applyQuestRewardPayouts() {
+  if (!gameState) return;
+  const payouts = syncQuestRewards(gameState);
+  for (const p of payouts) {
+    toastSuccess(`Квест: +${Math.round(p.amount).toLocaleString("ru-RU")} ₽`);
+  }
+  if (payouts.length) autoSaveGame({ silent: true });
+}
+
+function renderBuySkuPreview() {
+  const el = els.buySkuPreview;
+  if (!(el instanceof HTMLElement) || !gameState) return;
+  const skuId = els.skuSelect instanceof HTMLSelectElement ? els.skuSelect.value : "";
+  const sku = skuById(skuId) || gameState.skus[0];
+  if (!sku) {
+    el.innerHTML = `<span class="muted">—</span>`;
+    return;
+  }
+  const qLevel = getQualityLevel(gameState.qualityScore[sku.id] ?? DEFAULT_QUALITY_SCORE).level;
+  const thumb = renderSkuThumbHtml(sku, { size: 72, qualityLevel: qLevel });
+  el.innerHTML = `${thumb}<div class="buy-sku-preview-name">${sku.name}</div>`;
+  el.removeAttribute("aria-hidden");
 }
 
 function updateBuyHint() {
@@ -847,39 +1003,42 @@ function updateBuyHint() {
     return;
   }
   const total = qty * sku.purchaseCost;
-  const arrival = gameState.day + sku.leadTimeDays;
-  els.buyHint.textContent = `Стоимость: ${total.toLocaleString("ru-RU")} · прибытие в день ${arrival} (срок ${sku.leadTimeDays} дн.) · закупка ${sku.purchaseCost}/шт.`;
+  const lead = sku.leadTimeDays + getPurchaseLeadTimeExtra(gameState, sku.categoryId);
+  const arrival = gameState.day + lead;
+  els.buyHint.textContent = `Стоимость: ${total.toLocaleString("ru-RU")} ₽ · прибытие в день ${arrival} (срок ${lead} дн.) · закупка ${sku.purchaseCost}/шт.`;
 }
 
 function isPlayerUi() {
   return typeof document !== "undefined" && document.body.dataset.uiMode === "player";
 }
 
-function renderStockTable() {
-  const rows = getVisibleSkus()
-    .map((sku) => {
-      const q = gameState.inStock[sku.id] ?? 0;
-      const p = gameState.skuPrices[sku.id] ?? sku.recommendedPrice;
-      if (isPlayerUi()) {
-        return `<tr><td>${sku.name}</td><td class="num">${p}</td><td class="num">${q}</td></tr>`;
-      }
-      return `<tr><td>${sku.name}</td><td><code>${sku.id}</code></td><td class="num">${p}</td><td class="num">${q}</td></tr>`;
-    })
-    .join("");
-  const head = isPlayerUi()
-    ? `<table class="stock"><thead><tr><th>Название</th><th>Цена</th><th>Остаток</th></tr></thead><tbody>${rows}</tbody></table>`
-    : `<table class="stock"><thead><tr><th>Название</th><th>ID</th><th>Цена</th><th>Остаток</th></tr></thead><tbody>${rows}</tbody></table>`;
-  els.stockTable.innerHTML = head;
+function merchStockHtml(sku) {
+  const q = gameState.inStock[sku.id] ?? 0;
+  const cls = q <= 0 ? "merch-stock--empty" : q < 10 ? "merch-stock--low" : "";
+  return `<span class="merch-stock-qty ${cls}">${q.toLocaleString("ru-RU")}</span>`;
 }
 
 function fillSkuSelect() {
+  if (!els.skuSelect || !gameState?.skus?.length) return;
+  const prev = els.skuSelect instanceof HTMLSelectElement ? els.skuSelect.value : "";
   els.skuSelect.innerHTML = "";
-  for (const sku of getVisibleSkus()) {
+  const skus = [...gameState.skus];
+  const preferred =
+    skus.find((s) => s.id === prev) ||
+    skus.find((s) => s.categoryId === "beauty") ||
+    skus.find((s) => s.categoryId === gameState.categories?.[0]?.id) ||
+    skus[0];
+  for (const sku of skus) {
     const opt = document.createElement("option");
     opt.value = sku.id;
     opt.textContent = sku.name;
     els.skuSelect.appendChild(opt);
   }
+  if (preferred && els.skuSelect instanceof HTMLSelectElement) {
+    els.skuSelect.value = preferred.id;
+  }
+  renderBuySkuPreview();
+  updateBuyHint();
 }
 
 function fillCategoryFilterSelect() {
@@ -896,31 +1055,56 @@ function fillCategoryFilterSelect() {
   }
 }
 
-function renderIncoming() {
-  if (!gameState.incomingShipments.length) {
-    els.incomingList.innerHTML = '<span class="muted">Нет активных поставок</span>';
-    return;
-  }
-  const items = gameState.incomingShipments
-    .slice()
-    .sort((a, b) => a.arrivalDay - b.arrivalDay)
-    .map((s) => {
-      const sku = skuById(s.skuId);
-      const name = sku ? sku.name : s.skuId;
-      return `<li>${name}: <b>${s.qty}</b> шт. · прибытие день <b>${s.arrivalDay}</b> · заказ в день ${s.orderDay}</li>`;
-    })
-    .join("");
-  els.incomingList.innerHTML = `<ul class="incoming">${items}</ul>`;
+function formatIncomingEta(arrivalDay, currentDay) {
+  const daysLeft = Math.max(0, Math.round(Number(arrivalDay) || 0) - Math.round(Number(currentDay) || 0));
+  if (daysLeft === 0) return { label: "прибудет сегодня", soon: true };
+  if (daysLeft === 1) return { label: "ещё 1 день", soon: false };
+  return { label: `ещё ${daysLeft} дн.`, soon: false };
 }
 
-function renderMorningArrivals() {
-  if (!els.morningArrivals) return;
-  const raw = gameState.lastMorningArrivals || [];
-  if (!raw.length) {
-    els.morningArrivals.innerHTML =
-      '<span class="muted">В начале текущего дня партий не прибыло (или ещё ни разу не нажимали Next Day).</span>';
-    return;
+function renderIncomingSidebar() {
+  const root = els.incomingSidebarList;
+  if (!(root instanceof HTMLElement) || !gameState) return;
+  consolidateIncomingShipments(gameState);
+  const shipments = gameState.incomingShipments || [];
+  let html = "";
+  if (!shipments.length) {
+    root.className = "store-incoming-empty";
+    html = "Нет заказов в пути";
+  } else {
+    const rows = shipments
+      .slice()
+      .sort((a, b) => a.arrivalDay - b.arrivalDay)
+      .map((s) => {
+        const sku = skuById(s.skuId);
+        const name = sku ? sku.name : s.skuId;
+        const eta = formatIncomingEta(s.arrivalDay, gameState.day);
+        const qLevel = sku
+          ? getQualityLevel(gameState.qualityScore[sku.id] ?? DEFAULT_QUALITY_SCORE).level
+          : 1;
+        const thumb = sku ? renderSkuThumbHtml(sku, { size: 40, qualityLevel: qLevel }) : "";
+        const etaClass = eta.soon ? "store-incoming-eta store-incoming-eta--soon" : "store-incoming-eta";
+        return `<div class="store-incoming-item">
+        ${thumb}
+        <div class="store-incoming-body">
+          <div class="store-incoming-name">${name}</div>
+          <div class="store-incoming-qty">${s.qty.toLocaleString("ru-RU")} шт. · день ${s.arrivalDay}</div>
+          <div class="${etaClass}">${eta.label}</div>
+        </div>
+      </div>`;
+      })
+      .join("");
+    root.className = "store-incoming-list";
+    html = rows;
   }
+
+  const morningHtml = formatMorningArrivalsSidebarHtml();
+  root.innerHTML = html + morningHtml;
+}
+
+function formatMorningArrivalsSidebarHtml() {
+  const raw = gameState?.lastMorningArrivals || [];
+  if (!raw.length) return "";
   const bySku = new Map();
   for (const row of raw) {
     const id = String(row.skuId);
@@ -930,10 +1114,32 @@ function renderMorningArrivals() {
     const prev = bySku.get(id) || { name, qty: 0 };
     bySku.set(id, { name: prev.name || name, qty: prev.qty + q });
   }
+  if (!bySku.size) return "";
   const lines = [...bySku.values()]
-    .map((x) => `<li><b>${x.name}</b>: +${x.qty.toLocaleString("ru-RU")} шт. на склад</li>`)
+    .map((x) => `<div class="store-morning-line"><b>${x.name}</b>: +${x.qty.toLocaleString("ru-RU")} шт.</div>`)
     .join("");
-  els.morningArrivals.innerHTML = `<ul class="incoming" style="margin-top:0">${lines}</ul>`;
+  return `<div class="store-morning-block"><div class="store-morning-title">Приход сегодня</div>${lines}</div>`;
+}
+
+function skuTierLabel(tier) {
+  const map = { low: "Бюджет", mid: "Средний", high: "Премиум" };
+  return map[String(tier || "").toLowerCase()] || "";
+}
+
+function priceDeltaHint(price, recommended) {
+  const rec = Number(recommended) || 0;
+  const p = Number(price) || 0;
+  if (rec <= 0) return "";
+  const delta = ((p - rec) / rec) * 100;
+  if (Math.abs(delta) < 3) return `<span class="price-hint price-hint-ok">≈ рекомендации</span>`;
+  if (delta > 0) return `<span class="price-hint price-hint-high">+${delta.toFixed(0)}% к рек.</span>`;
+  return `<span class="price-hint price-hint-low">${delta.toFixed(0)}% к рек.</span>`;
+}
+
+function renderQualityMeter(score) {
+  const level = getQualityLevel(score);
+  const ring = qualityRingColor(level.level);
+  return `<div class="quality-meter" title="${level.name} · ${level.score}/100"><div class="quality-meter-fill" style="width:${level.score}%;background:${ring}"></div></div>`;
 }
 
 function resetMerchDom() {
@@ -945,22 +1151,34 @@ function renderMerchQualityCell(sku) {
   const score = gameState.qualityScore[sku.id] ?? DEFAULT_QUALITY_SCORE;
   const level = getQualityLevel(score);
   const next = getNextQualityLevel(score);
-  const badgeColor = level.level >= 5 ? "#8fd694" : level.level >= 3 ? "#c9d2ff" : "#ffcc66";
+  const badgeColor = qualityRingColor(level.level);
+  const meter = renderQualityMeter(score);
   if (!next) {
-    return `<span class="quality-level-badge" style="color:${badgeColor};font-weight:600">${level.name}</span><span class="muted" style="font-size:12px;display:block;margin-top:6px">Максимальный уровень</span>`;
+    return `${meter}<span class="quality-level-badge" style="color:${badgeColor}">${level.name}</span><span class="muted" style="font-size:11px;display:block;margin-top:4px">Максимальный уровень</span>`;
   }
   const cost = getQualityUpgradeCost(sku, score);
   const canAfford = Number(gameState.cash) >= cost;
   const disabled = canAfford ? "" : " disabled";
   const title = canAfford ? `Поднять до «${next.name}»` : "Недостаточно средств на счёте";
-  return `<span class="quality-level-badge" style="color:${badgeColor};font-weight:600">${level.name}</span><button type="button" class="btn-secondary js-quality-upgrade" data-sku-id="${sku.id}"${disabled} title="${title}" style="margin-top:6px;padding:4px 10px;font-size:12px;border-radius:6px">Улучшить → ${next.name} · ${money(cost)} ₽</button>`;
+  return `${meter}<span class="quality-level-badge" style="color:${badgeColor}">${level.name}</span><button type="button" class="btn-secondary js-quality-upgrade merch-upgrade-btn" data-sku-id="${sku.id}"${disabled} title="${title}">Улучшить → ${next.name} · ${money(cost)} ₽</button>`;
 }
 
 function renderMerchQualitySlots() {
   if (!gameState || els.merchRoot.dataset.built !== "1") return;
   for (const sku of getVisibleSkus()) {
+    const score = gameState.qualityScore[sku.id] ?? DEFAULT_QUALITY_SCORE;
+    const level = getQualityLevel(score);
     const slot = els.merchRoot.querySelector(`.js-quality-slot[data-sku-id="${sku.id}"]`);
     if (slot instanceof HTMLElement) slot.innerHTML = renderMerchQualityCell(sku);
+    const stockSlot = els.merchRoot.querySelector(`.js-stock-slot[data-sku-id="${sku.id}"]`);
+    if (stockSlot instanceof HTMLElement) stockSlot.innerHTML = merchStockHtml(sku);
+    const thumb = els.merchRoot.querySelector(`.sku-thumb-wrap[data-sku-id="${sku.id}"]`);
+    if (thumb instanceof HTMLElement) {
+      thumb.style.setProperty("--sku-thumb-ring", qualityRingColor(level.level));
+    }
+    const p = gameState.skuPrices[sku.id] ?? sku.recommendedPrice;
+    const hint = els.merchRoot.querySelector(`.js-price-hint[data-sku-id="${sku.id}"]`);
+    if (hint instanceof HTMLElement) hint.innerHTML = priceDeltaHint(p, sku.recommendedPrice);
   }
 }
 
@@ -972,24 +1190,44 @@ function buildMerchTableOnce() {
       const p = gameState.skuPrices[sku.id] ?? sku.recommendedPrice;
       const promo = gameState.promoOn[sku.id] ? "checked" : "";
       const rec = sku.recommendedPrice;
-      const idLine = isPlayerUi() ? "" : `<br/><code style="font-size:11px">${sku.id}</code>`;
-      return `<tr>
-        <td>${sku.name}${idLine}</td>
-        <td class="num">
-          <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap">
-            <input class="js-price" data-sku-id="${sku.id}" type="number" min="1" step="10" value="${p}" style="width:88px"/>
-            <button type="button" class="btn-secondary js-price-rec" data-sku-id="${sku.id}" style="padding:3px 8px;font-size:11px;border-radius:6px" title="Цена по рекомендации маркетплейса">Реком.</button>
+      const score = gameState.qualityScore[sku.id] ?? DEFAULT_QUALITY_SCORE;
+      const level = getQualityLevel(score);
+      const tier = skuTierLabel(sku.tier);
+      const idLine = isPlayerUi() ? "" : `<code class="merch-sku-id">${sku.id}</code>`;
+      const thumb = renderSkuThumbHtml(sku, { size: 56, qualityLevel: level.level });
+      return `<tr class="merch-row">
+        <td class="merch-product-cell">
+          <div class="merch-product">
+            ${thumb}
+            <div class="merch-product-text">
+              <div class="merch-product-name">${sku.name}</div>
+              <div class="merch-product-meta">${tier ? `<span class="merch-tier">${tier}</span> · ` : ""}рек. ${rec.toLocaleString("ru-RU")} ₽${idLine}</div>
+            </div>
           </div>
-          <div class="muted" style="font-size:11px;margin-top:4px;text-align:right">реком. ${rec.toLocaleString("ru-RU")} ₽</div>
         </td>
-        <td class="num js-quality-slot" data-sku-id="${sku.id}"></td>
-        <td class="num"><input class="js-promo" data-sku-id="${sku.id}" type="checkbox" ${promo}/></td>
+        <td class="merch-price-cell">
+          <div class="merch-price-editor">
+            <input class="js-price merch-price-input" data-sku-id="${sku.id}" type="number" min="1" step="10" value="${p}"/>
+            <span class="merch-price-currency">₽</span>
+            <button type="button" class="btn-secondary js-price-rec merch-rec-btn" data-sku-id="${sku.id}" title="Цена по рекомендации маркетплейса">Реком.</button>
+          </div>
+          <div class="js-price-hint" data-sku-id="${sku.id}">${priceDeltaHint(p, rec)}</div>
+        </td>
+        <td class="merch-stock-cell js-stock-slot" data-sku-id="${sku.id}">${merchStockHtml(sku)}</td>
+        <td class="merch-quality-cell js-quality-slot" data-sku-id="${sku.id}"></td>
+        <td class="merch-promo-cell">
+          <label class="merch-promo-toggle">
+            <input class="js-promo" data-sku-id="${sku.id}" type="checkbox" ${promo}/>
+            <span class="merch-promo-ui" aria-hidden="true"></span>
+            <span class="merch-promo-label">Промо</span>
+          </label>
+        </td>
       </tr>`;
     })
     .join("");
 
   const helpIcon = gameHelpIcon(QUALITY_HELP_TEXT, "Подсказка о качестве карточки");
-  els.merchRoot.innerHTML = `<table class="stock"><thead><tr><th>Товар</th><th>Цена</th><th>Качество ${helpIcon}</th><th>Промо</th></tr></thead><tbody>${rows}</tbody></table>`;
+  els.merchRoot.innerHTML = `<table class="stock merch-table"><thead><tr><th>Товар</th><th>Цена</th><th class="num">Остаток</th><th>Качество ${helpIcon}</th><th>Промо</th></tr></thead><tbody>${rows}</tbody></table>`;
   els.merchRoot.dataset.built = "1";
   renderMerchQualitySlots();
 }
@@ -1009,7 +1247,7 @@ function renderCostBreakdown() {
   if (!els.costBreakdown) return;
   const r = gameState.lastDayReport;
   if (!r?.totals) {
-    els.costBreakdown.textContent = "Нет данных — сначала нажми Next Day.";
+    els.costBreakdown.textContent = "Нет данных — сначала нажмите «Следующий день».";
     return;
   }
   const t = r.totals;
@@ -1017,7 +1255,7 @@ function renderCostBreakdown() {
   const rows = [
     { label: "Валовая выручка (до возвратов)", value: t.grossRevenue ?? t.netRevenue, sign: "+", shareBase: t.grossRevenue ?? t.netRevenue },
     { label: "Чистая выручка (после возвратов)", value: t.netRevenue, sign: "+", shareBase: t.netRevenue },
-    { label: "Себестоимость проданного (COGS)", value: t.cogs, sign: "−", shareBase: netRevenue },
+    { label: "Себестоимость проданного", value: t.cogs, sign: "−", shareBase: netRevenue },
     { label: "Комиссия маркетплейса", value: t.fee, sign: "−", shareBase: netRevenue },
     { label: "Эквайринг / платежи", value: t.payment, sign: "−", shareBase: netRevenue },
     { label: "Исходящая логистика (отгрузки)", value: t.logistics ?? 0, sign: "−", shareBase: netRevenue },
@@ -1043,53 +1281,169 @@ function renderCostBreakdown() {
     (Number(t.adCost) || 0) +
     (Number(t.overhead) || 0) +
     (Number(t.teamCost) || 0);
-  els.costBreakdown.innerHTML = `<p class="muted" style="margin:0 0 6px">День симуляции: <b>${r.day}</b></p><p class="muted" style="margin:0 0 8px">Ставки: fee ${(economyConstants.feeRate * 100).toFixed(1)}% · payment ${(economyConstants.paymentRate * 100).toFixed(1)}% · logistics ${money(economyConstants.outboundCostPerUnit)} / ед. · overhead ${money(economyConstants.fixedOverheadDaily)} / день · returnMod x${(Math.max(0.5, Math.min(1.5, Number(gameState.returnRateMod) || 1))).toFixed(2)}</p><table class="stock"><thead><tr><th>Статья</th><th class="num">Сумма</th><th class="num">Доля</th></tr></thead><tbody>${body}<tr><td><strong>Итого расходы</strong></td><td class="num"><strong>− ${money(costSum)}</strong></td><td class="num muted"><strong>${pct(costSum, netRevenue)}</strong></td></tr><tr><td><strong>Операционная прибыль</strong></td><td class="num"><strong>${money(t.operatingProfit)}</strong></td><td class="num muted"><strong>${pct(t.operatingProfit, netRevenue)}</strong></td></tr></tbody></table>`;
+  els.costBreakdown.innerHTML = `<p class="muted" style="margin:0 0 6px">День симуляции: <b>${r.day}</b></p><p class="muted" style="margin:0 0 8px">Ставки: комиссия ${(economyConstants.feeRate * 100).toFixed(1)}% · эквайринг ${(economyConstants.paymentRate * 100).toFixed(1)}% · логистика ${money(economyConstants.outboundCostPerUnit)} / ед. · постоянные расходы ${money(economyConstants.fixedOverheadDaily)} / день · модиф. возвратов ×${(Math.max(0.5, Math.min(1.5, Number(gameState.returnRateMod) || 1))).toFixed(2)}</p><table class="stock"><thead><tr><th>Статья</th><th class="num">Сумма</th><th class="num">Доля</th></tr></thead><tbody>${body}<tr><td><strong>Итого расходы</strong></td><td class="num"><strong>− ${money(costSum)}</strong></td><td class="num muted"><strong>${pct(costSum, netRevenue)}</strong></td></tr><tr><td><strong>Операционная прибыль</strong></td><td class="num"><strong>${money(t.operatingProfit)}</strong></td><td class="num muted"><strong>${pct(t.operatingProfit, netRevenue)}</strong></td></tr></tbody></table>`;
 }
 
-function renderYesterday() {
-  const r = gameState.lastDayReport;
-  if (!r) {
-    els.yesterdayReport.textContent = "Ещё не было симуляции (нажми Next Day).";
-    return;
+function renderSummarySidebar() {
+  const el = els.summary;
+  if (!(el instanceof HTMLElement) || !gameState) return;
+
+  const cash = Math.round(gameState.cash);
+  const stock = totalStock();
+  const stats = [
+    { label: "День", value: String(gameState.day) },
+    {
+      label: "На счёте",
+      value: `${cash.toLocaleString("ru-RU")} ₽`,
+      valueClass: "store-summary-stat-value--cash",
+    },
+    { label: "На складе", value: `${stock.toLocaleString("ru-RU")} шт.` },
+  ];
+
+  let dayResultHtml = "";
+  let hint = "";
+  if (gameState.lastDayReport) {
+    const revenue = Math.round(gameState.kpi.revenue);
+    const profit = Math.round(gameState.kpi.profit);
+    const profitClass =
+      profit >= 0 ? "store-summary-stat-value--profit-positive" : "store-summary-stat-value--profit-negative";
+    const sign = profit > 0 ? "+" : "";
+    dayResultHtml = `<div class="store-summary-divider"></div><div class="store-summary-subhead">Последний день</div>${[
+      { label: "Выручка", value: `${revenue.toLocaleString("ru-RU")} ₽` },
+      {
+        label: "Прибыль",
+        value: `${sign}${profit.toLocaleString("ru-RU")} ₽`,
+        valueClass: profitClass,
+      },
+    ]
+      .map(
+        (row) =>
+          `<div class="store-summary-stat"><span class="store-summary-stat-label">${row.label}</span><span class="store-summary-stat-value${row.valueClass ? ` ${row.valueClass}` : ""}">${row.value}</span></div>`
+      )
+      .join("")}`;
+  } else {
+    hint = "Закупите товар и нажмите «Следующий день», чтобы начать продажи.";
   }
-  const t = r.totals;
-  const unmet = t.unmetUnits ?? 0;
-  const ow = t.ordersWanted ?? 0;
-  const logi = t.logistics ?? 0;
-  const retCost = t.returnsCost ?? 0;
-  const servicePenalty = t.servicePenalty ?? 0;
-  const serviceRating = t.serviceRating ?? gameState.kpi?.serviceRating ?? 5;
-  const serviceStockoutImpact = t.serviceStockoutImpact ?? 0;
-  const serviceReturnsImpact = t.serviceReturnsImpact ?? 0;
-  const gross = t.grossRevenue ?? t.netRevenue;
-  const head = `День ${r.day}: валовая выручка ${money(gross)} → чистая ${money(t.netRevenue)} · операц. прибыль ${money(t.operatingProfit)} · логистика ${money(logi)} · возвраты (расход) ${money(retCost)} · штраф сервиса ${money(servicePenalty)} · рейтинг сервиса ${Number(serviceRating).toFixed(2)}/5 (вклад: ${STOCKOUT_CAUSE} ${serviceStockoutImpact.toFixed(2)}, возвраты ${serviceReturnsImpact.toFixed(2)}) · рекл. трафик ${t.adTrafficTotal.toFixed(1)} · рекл. ${money(t.adCost)} · оверхед ${money(t.overhead)} · <b>${STOCKOUT_NOUN}</b>: ${unmet}${ow > 0 ? ` из ${ow} желаемых заказов` : ""}`;
-  const lines = r.perSku
-    .filter((x) => x.orders > 0 || x.traffic > 50 || (x.unmetUnits ?? 0) > 0)
-    .slice(0, 8)
+
+  const rows = stats
     .map(
-      (x) =>
-        `${x.name}: хотели ${x.ordersWanted ?? "?"} → отгрузили ${x.orders}${(x.unmetUnits ?? 0) > 0 ? ` (не хватило ${x.unmetUnits})` : ""}, возвратов ${x.returned}, чистых продаж ${x.netSold}, raw ${(x.ordersRaw ?? 0).toFixed(1)}`
+      (row) =>
+        `<div class="store-summary-stat"><span class="store-summary-stat-label">${row.label}</span><span class="store-summary-stat-value${row.valueClass ? ` ${row.valueClass}` : ""}">${row.value}</span></div>`
     )
-    .join(" · ");
-  els.yesterdayReport.innerHTML = `${head}<br/><span class="muted" style="font-size:12px">${lines || "Мало активности — проверь остатки и цену."}</span>`;
+    .join("");
+  const hintHtml = hint ? `<p class="store-summary-hint">${hint}</p>` : "";
+  el.innerHTML = rows + dayResultHtml + hintHtml;
 }
 
 function renderDeadlockGuard() {
   if (!els.deadlockStatus) return;
-  const deadlock = isDeadlockState();
-  const minCost = minPurchaseCost();
-  const rescuesLeft = Math.max(0, MAX_RESCUES_PER_RUN - (gameState.rescuesUsed || 0));
-
-  if (deadlock) {
-    els.deadlockStatus.innerHTML = `<span style="color:#ffb36b"><b>Обнаружен риск тупика:</b> нет остатков, поставок в пути и кэша на минимальную закупку (${money(minCost)}).</span>`;
-  } else {
-    els.deadlockStatus.innerHTML = `Тупик не обнаружен. Минимальная закупка: <b>${money(minCost)}</b> · Использовано авансов: <b>${gameState.rescuesUsed || 0}</b>/<b>${MAX_RESCUES_PER_RUN}</b>.`;
-  }
+  const situation = analyzeDeadlockSituation();
+  els.deadlockStatus.innerHTML = situation.message;
 
   if (els.rescueBtn) {
-    els.rescueBtn.disabled = !deadlock || rescuesLeft <= 0;
-    els.rescueBtn.textContent = `Антикризисный аванс +${money(RESCUE_CASH_AMOUNT)}${rescuesLeft > 0 ? "" : " (лимит исчерпан)"}`;
+    els.rescueBtn.disabled = !situation.deadlock || situation.rescuesLeft <= 0;
+    els.rescueBtn.textContent = `Антикризисный аванс +${money(RESCUE_CASH_AMOUNT)}${situation.rescuesLeft > 0 ? "" : " (лимит исчерпан)"}`;
   }
+}
+
+function serviceRatingTier(sr) {
+  if (sr >= 4.2) return "good";
+  if (sr >= 3.6) return "warn";
+  return "bad";
+}
+
+function renderServiceRatingStars(sr) {
+  const filled = Math.max(0, Math.min(5, Math.round(sr)));
+  return Array.from({ length: 5 }, (_, i) => {
+    const on = i < filled ? " store-service-star--on" : "";
+    return `<span class="store-service-star${on}" aria-hidden="true">★</span>`;
+  }).join("");
+}
+
+function serviceRatingColor(sr) {
+  if (sr >= 4.2) return "#8fd694";
+  if (sr >= 3.6) return "#ffcc66";
+  return "#ff8f8f";
+}
+
+function renderServiceRatingSidebar() {
+  const el = els.serviceRating;
+  if (!(el instanceof HTMLElement) || !gameState) return;
+
+  if (!gameState.lastDayReport?.totals) {
+    el.className = "store-service-card store-service-card--pending";
+    el.innerHTML = `<div class="store-service-card-kicker">Рейтинг сервиса</div><p class="store-service-card-placeholder muted">Появится после первого дня продаж</p>`;
+    return;
+  }
+
+  const totals = gameState.lastDayReport.totals;
+  const sr = Number(totals.serviceRating ?? gameState.kpi?.serviceRating ?? 5);
+  const sp = Math.max(0, Number(totals.servicePenalty) || 0);
+  const si = Math.max(0, Number(totals.serviceStockoutImpact) || 0);
+  const ri = Math.max(0, Number(totals.serviceReturnsImpact) || 0);
+  const tier = serviceRatingTier(sr);
+  const scoreColor = serviceRatingColor(sr);
+
+  el.className = `store-service-card store-service-card--${tier}`;
+  el.style.setProperty("--service-score-color", scoreColor);
+  el.innerHTML = `<div class="store-service-card-header">
+      <span class="store-service-card-kicker">Рейтинг сервиса</span>
+      <span class="store-service-stars" aria-hidden="true">${renderServiceRatingStars(sr)}</span>
+    </div>
+    <div class="store-service-score">${sr.toFixed(2)}<span class="store-service-score-max">/5</span></div>
+    <dl class="store-service-metrics">
+      <div class="store-service-metric store-service-metric--penalty">
+        <dt>Штраф</dt>
+        <dd>${money(sp)} / день</dd>
+      </div>
+      <div class="store-service-metric store-service-metric--stockout">
+        <dt>${STOCKOUT_CAUSE}</dt>
+        <dd>${si.toFixed(2)}</dd>
+      </div>
+      <div class="store-service-metric store-service-metric--returns">
+        <dt>Возвраты</dt>
+        <dd>${ri.toFixed(2)}</dd>
+      </div>
+    </dl>`;
+}
+
+function syncServiceDiagnosticsVisibility() {
+  const panel = els.serviceDiagnostics;
+  const btn = els.serviceDiagnosticsToggle;
+  const hasData = !!gameState?.lastDayReport?.totals;
+  if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+  btn.disabled = !hasData;
+  panel.hidden = !hasData || !serviceDiagHintsOpen;
+  btn.setAttribute("aria-expanded", hasData && serviceDiagHintsOpen ? "true" : "false");
+  btn.textContent = hasData && serviceDiagHintsOpen ? "Скрыть подсказку" : "Подсказка по рейтингу";
+}
+
+function renderServiceDiagnosticsSidebar() {
+  const panel = els.serviceDiagnostics;
+  const btn = els.serviceDiagnosticsToggle;
+  if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+
+  if (!gameState?.lastDayReport?.totals) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    btn.disabled = true;
+    btn.setAttribute("aria-expanded", "false");
+    btn.textContent = "Подсказка по рейтингу";
+    return;
+  }
+
+  const diagnosisLine = buildServiceDiagnosisLine(gameState.lastDayReport.totals);
+  const trendLine = buildServiceTrendLine();
+  const trendBadges = buildServiceTrendBadges();
+  const selectedDayDetails = buildServiceSelectedDayDetails();
+  const lines = [
+    `<div class="store-service-hint-line">${diagnosisLine}</div>`,
+    `<div class="store-service-hint-line">${trendLine}</div>`,
+  ];
+  if (trendBadges) lines.push(`<div class="store-service-hint-line">${trendBadges}</div>`);
+  if (selectedDayDetails) lines.push(`<div class="store-service-hint-line">${selectedDayDetails}</div>`);
+  panel.innerHTML = lines.join("");
+  syncServiceDiagnosticsVisibility();
 }
 
 function buildServiceDiagnosisLine(totals) {
@@ -1173,14 +1527,15 @@ function buildServiceSelectedDayDetails() {
 }
 
 function kpiHintByKind(kind) {
-  if (kind === "revenue") return "Чистая выручка после возвратов. Выше — лучше.";
+  if (kind === "revenue") return "Чистая выручка после возвратов. Чем выше — тем лучше.";
   if (kind === "profit") return "Операционная прибыль дня после всех расходов и штрафов.";
-  if (kind === "marginPct") return "Profit / Net Revenue. Цель: держать в положительной зоне.";
-  if (kind === "acos") return "Ad Cost / Net Revenue. Чем ниже, тем эффективнее реклама.";
-  if (kind === "returnPct") return "Returned / Orders. Рост часто бьёт по рейтингу сервиса.";
+  if (kind === "marginPct") return "Доля прибыли в чистой выручке. Держите в положительной зоне.";
+  if (kind === "acos") return "ACOS — доля рекламных расходов в выручке. Чем ниже, тем эффективнее реклама.";
+  if (kind === "returnPct") return "Доля возвращённых заказов. Рост часто бьёт по рейтингу сервиса.";
   if (kind === "stockoutRate") return "Невыполненные заказы из‑за пустого склада. Чем ниже, тем лучше.";
-  if (kind === "unmetUnits") return "Количество невыполненных единиц из-за нехватки стока.";
+  if (kind === "unmetUnits") return "Количество невыполненных единиц из-за нехватки на складе.";
   if (kind === "daysOfStock") return "Оценка запаса в днях по текущей скорости продаж.";
+  if (kind === "cash") return "Свободные деньги на счёте магазина.";
   return "";
 }
 
@@ -1247,7 +1602,7 @@ function renderCampaignReadability() {
   const margin = Number(k.marginPct) || 0;
   const daysStock = Number(k.daysOfStock) || 0;
   const riskFlags = [];
-  if (runRateProfit < 0) riskFlags.push("отрицательный run-rate прибыли");
+  if (runRateProfit < 0) riskFlags.push("отрицательная дневная прибыль");
   if (stockout > 0.2) riskFlags.push(`высокий ${STOCKOUT_NOUN.toLowerCase()}`);
   if (returns > 0.14) riskFlags.push("высокие возвраты");
   if (daysStock < 1) riskFlags.push("низкий запас в днях");
@@ -1263,7 +1618,7 @@ function renderCampaignReadability() {
   if (returns > 0.14) actions.push("снизить возвраты: качество карточки и ожидания клиента");
   if (!actions.length) actions.push("сохранять текущий контур и масштабировать в прибыльных категориях");
   const riskText = riskFlags.length ? riskFlags.join(", ") : "критических рисков не видно";
-  els.campaignReadability.innerHTML = `<div><b>Статус 60-дневной кампании:</b> <span style="color:${statusColor}"><b>${status}</b></span> · прогноз кэша через 60 дней: <b>${money(projectedCash60)}</b></div><div class="muted" style="margin-top:4px">Run-rate прибыли: <b>${money(runRateProfit)}/день</b> · тренд прибыли (по истории): <b>${money(trendProfit)}</b> · тренд дефицита: <b>${(trendStockout * 100).toFixed(1)} п.п.</b></div><div class="muted" style="margin-top:4px">Риски: ${riskText}</div><div class="muted" style="margin-top:4px">Фокус на ближайшие дни: ${actions.map((x) => `• ${x}`).join(" ")}</div>`;
+  els.campaignReadability.innerHTML = `<div><b>Статус 60-дневной кампании:</b> <span style="color:${statusColor}"><b>${status}</b></span> · прогноз кэша через 60 дней: <b>${money(projectedCash60)}</b></div><div class="muted" style="margin-top:4px">Прибыль за день: <b>${money(runRateProfit)}/день</b> · тренд прибыли (по истории): <b>${money(trendProfit)}</b> · тренд дефицита: <b>${(trendStockout * 100).toFixed(1)} п.п.</b></div><div class="muted" style="margin-top:4px">Риски: ${riskText}</div><div class="muted" style="margin-top:4px">Фокус на ближайшие дни: ${actions.map((x) => `• ${x}`).join(" ")}</div>`;
 }
 
 function applyBalancePreset(presetId) {
@@ -1369,15 +1724,20 @@ function tutorialChromeFromContent(content) {
   if (!content) return {};
   return {
     highlightNextDay: content.highlightNextDay === true,
-    hideBuyManual: content.id === "buy_intro" || content.id === "buy_action",
+    hideBuyManual: content.id === "buy_intro",
     hideReset: content.step <= 5,
   };
+}
+
+function filterTutorialVisibleSections(step, isDevUi) {
+  const sections = tutorialVisibleSections(step);
+  return isDevUi ? sections : sections.filter((id) => id !== "tutorial");
 }
 
 function syncTutorialCardVisibility(isDevUi) {
   const card = document.querySelector('[data-ui-section="tutorial"]');
   if (!(card instanceof HTMLElement)) return;
-  const show = isDevUi || isTutorialActive(gameState);
+  const show = isDevUi && isTutorialActive(gameState);
   card.hidden = !show;
   card.style.display = show ? "" : "none";
 }
@@ -1403,8 +1763,9 @@ function advanceTutorial() {
 function showTutorialShell(step = 1, state = gameState) {
   const content = getTutorialContent(step, state);
   if (!content) return;
-  applyTutorialUi(step, tutorialVisibleSections(step), tutorialChromeFromContent(content));
-  renderTutorialHero(content);
+  const isDevUi = typeof document !== "undefined" && document.body.dataset.uiMode === "dev";
+  applyTutorialUi(step, filterTutorialVisibleSections(step, isDevUi), tutorialChromeFromContent(content));
+  if (isDevUi) renderTutorialHero(content);
   renderTutorialSpotlight(content);
 }
 
@@ -1420,12 +1781,22 @@ function renderOnboardingPanel() {
     isTutorialActive(gameState) && tutorialStep > 0 ? getTutorialContent(tutorialStep, gameState) : null;
 
   if (tutorialContent) {
-    renderTutorialHero(tutorialContent);
+    const isDevUi = typeof document !== "undefined" && document.body.dataset.uiMode === "dev";
+    if (isDevUi) {
+      renderTutorialHero(tutorialContent);
+    } else {
+      els.onboardingPanel.innerHTML = "";
+    }
     return;
   }
 
   if (gameState.onboardingHidden) {
     els.onboardingPanel.innerHTML = `<span class="muted">Подсказки скрыты. Меню ⚙ → «Обучение заново» или «Начать игру заново».</span>`;
+    return;
+  }
+
+  if (isSimpleQuestActive(gameState) && !isTutorialActive(gameState)) {
+    els.onboardingPanel.innerHTML = `<span class="muted">Стартовый квест — шаги в боковой панели справа. Меню ⚙ → «Достижения».</span>`;
     return;
   }
 
@@ -1460,10 +1831,24 @@ function renderOnboardingPanel() {
   els.onboardingPanel.innerHTML = `${hero}${hintsBlock}`;
 }
 
+function completePlayerOnboarding() {
+  if (!gameState) return false;
+  if (isQuestCompleted(gameState) && !isTutorialActive(gameState)) return false;
+  if (!isQuestCompleted(gameState)) completeSimpleQuest(gameState);
+  if (isTutorialActive(gameState)) {
+    gameState.tutorialCompleted = true;
+    gameState.beginnerUiExpanded = true;
+  }
+  hideTutorialSpotlight();
+  return true;
+}
+
 function finishTutorial() {
   if (!gameState) return;
   gameState.tutorialCompleted = true;
+  gameState.beginnerUiExpanded = true;
   hideTutorialSpotlight();
+  runAchievementCheck();
   autoSaveGame({ silent: true });
   render();
 }
@@ -1490,12 +1875,15 @@ function restartTutorial() {
 function renderBeginnerTeaser(tier) {
   const el = document.getElementById("beginnerTeaser");
   if (!(el instanceof HTMLElement)) return;
-  const text = beginnerTeaserText(tier);
+  const day = Number(gameState?.day) || 1;
+  const text = beginnerTeaserText(tier, day);
   if (!text) {
     el.hidden = true;
+    el.style.display = "none";
     return;
   }
   el.hidden = false;
+  el.style.display = "";
   el.innerHTML = `<b>Скоро откроется:</b> ${text}`;
 }
 
@@ -1504,28 +1892,11 @@ function quickStartBuy() {
   const sku =
     gameState.skus.find((s) => s.categoryId === "beauty" || s.categoryId === gameState.categories?.[0]?.id) ||
     gameState.skus[0];
-  const qty = 80;
-  const totalCost = qty * sku.purchaseCost;
-  if (gameState.cash < totalCost) {
-    toastError(
-      `Недостаточно денег для стартовой закупки. Нужно ${money(totalCost)} ₽, на счёте ${money(gameState.cash)} ₽.`
-    );
-    return;
-  }
-  gameState.cash -= totalCost;
-  gameState.inStock[sku.id] = (gameState.inStock[sku.id] || 0) + qty;
-  if (gameState.adBudget < 1400) {
-    gameState.adBudget = 1400;
-  }
-  if (els.skuSelect instanceof HTMLSelectElement) {
-    els.skuSelect.value = sku.id;
-  }
-  if (els.qtyInput instanceof HTMLInputElement) {
-    els.qtyInput.value = String(qty);
-  }
-  syncOnboardingProgress(gameState, onboardingSteps);
-  autoSaveGame({ silent: true });
-  render();
+  if (els.skuSelect instanceof HTMLSelectElement) els.skuSelect.value = sku.id;
+  if (els.qtyInput instanceof HTMLInputElement) els.qtyInput.value = "80";
+  renderBuySkuPreview();
+  updateBuyHint();
+  purchase();
 }
 
 function expandAllPlayerSections() {
@@ -2045,19 +2416,19 @@ function runSafeRecoveryPresetV2() {
   syncCostModelUiFromState();
   syncReturnsUiFromState();
   render();
-  toastSuccess(`Safe recovery v2 применен: +${units} шт. в stock, списано ${money(spent)}, adBudget=1200.`);
+  toastSuccess(`Безопасное восстановление применено: +${units} шт. на склад, списано ${money(spent)}, бюджет рекламы 1200 ₽/день.`);
 }
 
 function topUnmetSkuLine(limit = 3) {
-  if (!gameState?.skus) return "Top unmet SKU: нет данных.";
+  if (!gameState?.skus) return "Топ невыполненного спроса: нет данных.";
   const unmetMemory = gameState.unmetMemory && typeof gameState.unmetMemory === "object" ? gameState.unmetMemory : {};
   const top = [...gameState.skus]
     .map((s) => ({ name: s.name, score: Math.max(0, Number(unmetMemory[s.id]) || 0) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .filter((x) => x.score > 0.01);
-  if (!top.length) return "Top unmet SKU: дефицитные позиции не выявлены.";
-  return `Top unmet SKU: ${top.map((x) => `${x.name} (${x.score.toFixed(1)})`).join(" · ")}`;
+  if (!top.length) return "Топ невыполненного спроса: дефицитные позиции не выявлены.";
+  return `Топ невыполненного спроса: ${top.map((x) => `${x.name} (${x.score.toFixed(1)})`).join(" · ")}`;
 }
 
 function buildPhase2InternalReport() {
@@ -2285,7 +2656,7 @@ function applyQolPreset(presetId) {
 }
 
 function renderQolPresetsPanel() {
-  if (!els.qolPresetsPanel) return;
+  if (!els.qolPresetsPanel || isPlayerUi()) return;
   const buttons = qolPresets
     .map(
       (p) =>
@@ -2435,7 +2806,10 @@ async function activateSupportChannel(kind, value) {
 
 function renderSupportChannels() {
   if (!els.supportChannelsPanel) return;
-  const buttons = (softLaunchConfig.support?.channels || [])
+  const channels = (softLaunchConfig.support?.channels || []).filter(
+    (ch) => !(isPlayerUi() && ch.kind === "link")
+  );
+  const buttons = channels
     .map((ch) => {
       const v = escapeAttr(ch.value);
       const label = escapeAttr(ch.label);
@@ -2787,26 +3161,54 @@ function renderKpiCharts() {
     return;
   }
   const panels = buildKpiChartPanels(gameState);
-  els.kpiChartsRow.innerHTML = renderKpiChartsHtml(panels);
+  const simpleKpi = shouldUseSimpleKpi(gameState) && !isTutorialActive(gameState);
+  const visiblePanels = simpleKpi ? panels.filter((p) => p.id === "profit") : panels;
+  els.kpiChartsRow.innerHTML = renderKpiChartsHtml(visiblePanels);
 }
 
 function renderKpiDashboard() {
   if (!els.kpiDashboard) return;
+  const tutorialResults =
+    isTutorialActive(gameState) && getTutorialContent(resolveTutorialStep(gameState), gameState)?.id === "results";
+
   if (!gameState.lastDayReport) {
-    els.kpiDashboard.innerHTML = '<div class="muted">Нет данных — сначала нажми Next Day.</div>';
+    if (tutorialResults) {
+      const demo = [
+        { title: "Выручка", value: "—", cls: "muted" },
+        { title: "Прибыль", value: "—", cls: "muted" },
+        { title: "Маржа", value: "—", cls: "muted" },
+      ];
+      els.kpiDashboard.innerHTML = demo
+        .map(
+          (c) =>
+            `<div class="kpi-card"><div class="kpi-title">${c.title}</div><div class="kpi-value ${c.cls}">${c.value}</div><div class="muted" style="margin-top:4px">после первого дня</div></div>`
+        )
+        .join("");
+      return;
+    }
+    els.kpiDashboard.innerHTML = '<div class="muted">Нет данных — сначала нажмите «Следующий день».</div>';
     return;
   }
 
   const k = gameState.kpi;
   const tutorialSimple =
     isTutorialActive(gameState) && getTutorialContent(resolveTutorialStep(gameState), gameState)?.id === "results";
-  const cards = tutorialSimple
-    ? [
-        { kind: "revenue", title: "Выручка", value: money(k.revenue), cls: "kpi-good" },
-        { kind: "profit", title: "Прибыль", value: money(k.profit), cls: kpiClassByValue("profit", k.profit) },
-        { kind: "marginPct", title: "Маржа", value: `${k.marginPct.toFixed(1)}%`, cls: kpiClassByValue("marginPct", k.marginPct) },
-      ]
-    : [
+  const questSimple = shouldUseSimpleKpi(gameState) && !isTutorialActive(gameState);
+  let cards;
+  if (tutorialSimple) {
+    cards = [
+      { kind: "revenue", title: "Выручка", value: money(k.revenue), cls: "kpi-good" },
+      { kind: "profit", title: "Прибыль", value: money(k.profit), cls: kpiClassByValue("profit", k.profit) },
+      { kind: "marginPct", title: "Маржа", value: `${k.marginPct.toFixed(1)}%`, cls: kpiClassByValue("marginPct", k.marginPct) },
+    ];
+  } else if (questSimple) {
+    cards = [
+      { kind: "cash", title: "На счёте", value: money(gameState.cash), cls: gameState.cash >= 80_000 ? "kpi-good" : "kpi-warn" },
+      { kind: "profit", title: "Прибыль", value: money(k.profit), cls: kpiClassByValue("profit", k.profit) },
+      { kind: "daysOfStock", title: "Дней запаса", value: `${k.daysOfStock.toFixed(1)}`, cls: k.daysOfStock >= 2 ? "kpi-good" : k.daysOfStock >= 1 ? "kpi-warn" : "kpi-bad" },
+    ];
+  } else {
+    cards = [
     { kind: "revenue", title: "Выручка (чистая)", value: money(k.revenue), cls: "kpi-good" },
     { kind: "profit", title: "Прибыль", value: money(k.profit), cls: kpiClassByValue("profit", k.profit) },
     { kind: "marginPct", title: "Маржа", value: `${k.marginPct.toFixed(1)}%`, cls: kpiClassByValue("marginPct", k.marginPct) },
@@ -2816,6 +3218,7 @@ function renderKpiDashboard() {
     { kind: "unmetUnits", title: "Нехватка, шт", value: `${Math.round(k.unmetUnits)}`, cls: k.unmetUnits > 0 ? "kpi-bad" : "kpi-good" },
     { kind: "daysOfStock", title: "Дней запаса", value: `${k.daysOfStock.toFixed(1)}`, cls: k.daysOfStock >= 2 ? "kpi-good" : k.daysOfStock >= 1 ? "kpi-warn" : "kpi-bad" },
   ];
+  }
 
   els.kpiDashboard.innerHTML = cards
     .map(
@@ -2867,9 +3270,9 @@ function renderCategoryKpiTable() {
   }
 
   const heatBadge = (profit, stockoutRate) => {
-    if (profit < 0 || stockoutRate > 0.2) return { text: "High Risk", color: "#ff8f8f", bg: "#3a1f28" };
-    if (stockoutRate > 0.08 || profit < 15000) return { text: "Watch", color: "#ffcc66", bg: "#3b3220" };
-    return { text: "Healthy", color: "#8fd694", bg: "#1e3526" };
+    if (profit < 0 || stockoutRate > 0.2) return { id: "high", text: "Высокий риск", color: "#ff8f8f", bg: "#3a1f28" };
+    if (stockoutRate > 0.08 || profit < 15000) return { id: "watch", text: "Внимание", color: "#ffcc66", bg: "#3b3220" };
+    return { id: "ok", text: "Норма", color: "#8fd694", bg: "#1e3526" };
   };
 
   const rowsData = [...byCat.values()]
@@ -2887,10 +3290,10 @@ function renderCategoryKpiTable() {
     })
     .join("");
 
-  els.categoryKpiTable.innerHTML = `<table class="stock"><thead><tr><th>Категория</th><th class="num">Net revenue</th><th class="num">Oper. profit (до ad/overhead)</th><th class="num">${STOCKOUT_RATE}</th><th class="num">Heat</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:6px 0 0">Heatmap логика: <b>Healthy</b> — прибыльная категория с низким дефицитом; <b>Watch</b> — зона внимания; <b>High Risk</b> — высокий риск или убыточность.</p>`;
+  els.categoryKpiTable.innerHTML = `<table class="stock"><thead><tr><th>Категория</th><th class="num">Чистая выручка</th><th class="num">Опер. прибыль (до рекламы и оверхеда)</th><th class="num">${STOCKOUT_RATE}</th><th class="num">Статус</th></tr></thead><tbody>${rows}</tbody></table><p class="muted" style="margin:6px 0 0"><b>Норма</b> — прибыльная категория с низким дефицитом; <b>Внимание</b> — зона риска; <b>Высокий риск</b> — убыточность или сильный дефицит.</p>`;
 
   if (!els.categoryRecommendations) return;
-  const risks = rowsData.filter((x) => x.heat.text === "High Risk").slice(0, 3);
+  const risks = rowsData.filter((x) => x.heat.id === "high").slice(0, 3);
   if (!risks.length) {
     els.categoryRecommendations.innerHTML = '<span style="color:#8fd694">Рекомендации: критических категорий нет, портфель выглядит устойчиво.</span>';
     return;
@@ -2902,20 +3305,43 @@ function renderCategoryKpiTable() {
       if (x.stockoutRate > 0.2) recs.push("увеличить закупку и/или сократить срок доставки");
       if (x.operatingProfit < 0) recs.push("поднять цену или снизить рекламу по категории");
       if (x.operatingProfit > 0 && x.stockoutRate > 0.2) recs.push("добавить рекламный бюджет после пополнения стока");
-      if (!recs.length) recs.push("провести ручную проверку price/quality/promo");
+      if (!recs.length) recs.push("проверить цену, качество карточки и промо");
       return `<li style="margin:4px 0"><b>${x.catName}</b>: ${recs.join("; ")}.</li>`;
     })
     .join("");
-  els.categoryRecommendations.innerHTML = `<div class="muted"><b>Авто-рекомендации (High Risk):</b></div><ul class="incoming" style="margin-top:6px">${tips}</ul>`;
+  els.categoryRecommendations.innerHTML = `<div class="muted"><b>Авто-рекомендации (высокий риск):</b></div><ul class="incoming" style="margin-top:6px">${tips}</ul>`;
+}
+
+function syncRangeSliderVisual(el) {
+  if (!(el instanceof HTMLInputElement) || el.type !== "range") return;
+  const min = Number(el.min);
+  const max = Number(el.max);
+  const val = Number(el.value);
+  const lo = Number.isFinite(min) ? min : 0;
+  const hi = Number.isFinite(max) ? max : 100;
+  const pct = hi === lo ? 0 : ((val - lo) / (hi - lo)) * 100;
+  el.style.setProperty("--range-pct", `${Math.max(0, Math.min(100, pct))}%`);
 }
 
 function syncAdUiFromState() {
   if (els.adEnabledToggle instanceof HTMLInputElement) {
     els.adEnabledToggle.checked = gameState.adEnabled !== false;
   }
-  els.adBudgetRange.value = String(gameState.adBudget);
+  if (els.adBudgetRange instanceof HTMLInputElement) {
+    els.adBudgetRange.value = String(gameState.adBudget);
+    syncRangeSliderVisual(els.adBudgetRange);
+  }
+  if (els.adBudgetField instanceof HTMLElement) {
+    els.adBudgetField.classList.toggle("ad-budget-field--off", gameState.adEnabled === false);
+  }
   const effective = gameState.adEnabled === false ? 0 : gameState.adBudget;
-  els.adBudgetLabel.textContent = `${gameState.adBudget.toLocaleString("ru-RU")} / день · в модель: ${effective.toLocaleString("ru-RU")}`;
+  if (els.adBudgetLabel instanceof HTMLElement) {
+    els.adBudgetLabel.textContent = isPlayerUi()
+      ? gameState.adEnabled === false
+        ? "выкл"
+        : `${effective.toLocaleString("ru-RU")} ₽ / день`
+      : `${gameState.adBudget.toLocaleString("ru-RU")} / день · в модель: ${effective.toLocaleString("ru-RU")}`;
+  }
 }
 
 function getEffectiveAdBudget() {
@@ -2927,6 +3353,7 @@ function syncReturnsUiFromState() {
   if (!gameState || !els.returnRateModRange || !els.returnRateModLabel) return;
   const mod = Math.max(0.5, Math.min(1.5, Number(gameState.returnRateMod) || 1));
   els.returnRateModRange.value = String(mod);
+  syncRangeSliderVisual(els.returnRateModRange);
   els.returnRateModLabel.textContent = `x${mod.toFixed(2)}`;
 }
 
@@ -2941,9 +3368,9 @@ async function ensurePlatformReady() {
     player: res.player || null,
     message: res.available
       ? res.player
-        ? "Yandex SDK: подключён · облачное сохранение активно."
-        : "Yandex SDK: подключён · облако через mock (getPlayer недоступен)."
-      : "Yandex SDK: недоступен · облако через local mock, localStorage как резерв.",
+        ? "Яндекс Игры: SDK подключён · облачное сохранение активно."
+        : "Яндекс Игры: SDK подключён · облако через тестовый режим (профиль недоступен)."
+      : "Яндекс Игры: SDK недоступен · облако через локальную копию, браузерное хранилище как резерв.",
   };
   bindAccountSelectionHandlers(res.sdk, {
     onOpen: () => {
@@ -3019,7 +3446,7 @@ function canClaimRewardedNow() {
 
 async function claimRewardedReward() {
   if (!gameState?.lastDayReport) {
-    toastWarn("Сначала заверши хотя бы один игровой день (Next Day).");
+    toastWarn("Сначала завершите хотя бы один игровой день («Следующий день»).");
     return;
   }
   if (!canClaimRewardedNow()) {
@@ -3032,6 +3459,7 @@ async function claimRewardedReward() {
   const hasYsdkRewarded = !!(platformState.available && sdk?.adv && typeof sdk.adv.showRewardedVideo === "function");
 
   if (hasYsdkRewarded) {
+    stopYandexGameplay(sdk);
     rewarded = await new Promise((resolve) => {
       try {
         sdk.adv.showRewardedVideo({
@@ -3046,6 +3474,7 @@ async function claimRewardedReward() {
         resolve(false);
       }
     });
+    startYandexGameplay(sdk);
   } else {
     showGameConfirm({
       title: "Тестовая награда",
@@ -3090,14 +3519,14 @@ function canShowInterstitialToday() {
 function renderInterstitialState() {
   if (!els.interstitialHint) return;
   if (!gameState?.lastDayReport) {
-    els.interstitialHint.textContent = "Interstitial: появится после первой симуляции дня.";
+    els.interstitialHint.textContent = "Полноэкранная реклама: появится после первой симуляции дня.";
     return;
   }
   const last = Number(gameState.lastInterstitialDay || 0);
   const remaining = Math.max(0, INTERSTITIAL_COOLDOWN_DAYS - (gameState.day - last));
   els.interstitialHint.textContent = canShowInterstitialToday()
-    ? `Interstitial готов к показу (кулдаун ${INTERSTITIAL_COOLDOWN_DAYS} дн.).`
-    : `Interstitial на кулдауне: ещё ${remaining} дн.`;
+    ? `Полноэкранная реклама готова к показу (кулдаун ${INTERSTITIAL_COOLDOWN_DAYS} дн.).`
+    : `Полноэкранная реклама на кулдауне: ещё ${remaining} дн.`;
 }
 
 function renderPlaytestChecklist() {
@@ -3144,6 +3573,7 @@ async function tryShowInterstitialAfterDay() {
   const hasYsdkInterstitial = !!(platformState.available && sdk?.adv && typeof sdk.adv.showFullscreenAdv === "function");
 
   if (hasYsdkInterstitial) {
+    stopYandexGameplay(sdk);
     await new Promise((resolve) => {
       try {
         sdk.adv.showFullscreenAdv({
@@ -3157,6 +3587,7 @@ async function tryShowInterstitialAfterDay() {
         resolve(false);
       }
     });
+    startYandexGameplay(sdk);
   } else {
     // Dev fallback: не блокируем цикл игры, только имитируем факт показа.
     console.info("Interstitial fallback shown (SDK unavailable)");
@@ -3251,6 +3682,11 @@ async function loadCryptoCatalog() {
   cryptoAssets = normalizeCryptoAssets(raw);
 }
 
+async function loadLuxuryCatalog() {
+  const raw = await loadJson("./src/data/luxury_items.json", []);
+  luxuryCatalog = normalizeLuxuryCatalog(raw);
+}
+
 async function loadProgressionCatalog() {
   const [nodes, synergies, styles] = await Promise.all([
     loadJson("./src/data/progression_nodes.json", DEFAULT_PROGRESSION_NODES_FALLBACK),
@@ -3270,6 +3706,7 @@ async function loadProgressionCatalog() {
     loadRetentionCatalog(),
     loadReleaseCatalog(),
     loadCryptoCatalog(),
+    loadLuxuryCatalog(),
   ]);
 }
 
@@ -3287,10 +3724,11 @@ function renderTeamPanel() {
   const rows = hired
     .map((n) => {
       const sal = Math.max(0, Number(n.dailySalary) || 0);
-      return `<li style="margin:4px 0"><b>${n.title}</b>${sal ? ` — ${money(sal)}/день` : " — без ЗП"}</li>`;
+      const tip = escapeAttr(n.desc || "Бонус роли");
+      return `<li style="margin:4px 0"><span class="team-role-tip game-tip" data-tip="${tip}" tabindex="0" role="button"><b>${n.title}</b></span>${sal ? ` — ${money(sal)}/день` : " — без ЗП"}</li>`;
     })
     .join("");
-  els.teamPanel.innerHTML = `<div>Нанято: <b>${hired.length}</b> · суммарная ЗП: <b>${money(daily)}</b>/день (списывается в P&amp;L)</div><ul class="incoming" style="margin-top:6px">${rows}</ul>`;
+  els.teamPanel.innerHTML = `<div>Нанято: <b>${hired.length}</b> · суммарная ЗП: <b>${money(daily)}</b>/день (списывается в отчёт о прибылях и убытках)</div><ul class="incoming" style="margin-top:6px">${rows}</ul>`;
 }
 
 function finalizeSessionTelemetry() {
@@ -3303,6 +3741,7 @@ function finalizeSessionTelemetry() {
 }
 
 let initGameGeneration = 0;
+let nextDayBusy = false;
 
 async function initGame(options = {}) {
   const generation = ++initGameGeneration;
@@ -3315,15 +3754,17 @@ async function initGameBody(options = {}, generation = initGameGeneration) {
   if (generation !== initGameGeneration) return;
   await loadSkuNamesRu();
   await loadProgressionCatalog();
-  const [categories, rawSkus, rawConst, rawEvents] = await Promise.all([
+  const [categories, rawSkus, rawConst, rawEvents, achievementsRaw] = await Promise.all([
     loadJson("./src/data/categories.json", defaultCategories),
     loadSkuCatalog(),
     loadJson("./src/data/constants.json", defaultConstants),
     loadEventCatalog(),
+    loadJson("./src/data/achievements.json", []),
   ]);
 
   economyConstants = normalizeConstants(rawConst);
   eventDefinitions = Array.isArray(rawEvents) ? rawEvents : [];
+  setAchievementCatalog(Array.isArray(achievementsRaw) ? achievementsRaw : []);
 
   if (!skipAutoLoad) {
     const picked = await loadHybridSave();
@@ -3340,6 +3781,7 @@ async function initGameBody(options = {}, generation = initGameGeneration) {
         showTutorialShell(1);
       }
       console.log(`Auto-loaded save from ${picked.source}, day`, gameState.day);
+      finalizeYandexGameBoot();
       return;
     }
   }
@@ -3352,7 +3794,7 @@ async function initGameBody(options = {}, generation = initGameGeneration) {
     day: 1,
     cash: 120000,
     adBudget: 0,
-    adEnabled: true,
+    adEnabled: false,
     returnRateMod: 1,
     selectedCategoryId: categories[0]?.id || "beauty",
     categories,
@@ -3398,8 +3840,19 @@ async function initGameBody(options = {}, generation = initGameGeneration) {
     majorBugStatus: {},
     kpi: defaultKpi(),
     crypto: createEmptyCryptoState(cryptoAssets),
+    luxury: createEmptyLuxuryState(),
+    shopName: "",
+    shopNamePromptDone: false,
+    simpleQuestStep: 1,
+    simpleQuestCompleted: false,
+    simpleQuestRewardsClaimed: [],
+    questAdBaseline: { enabled: false, budget: 0 },
+    questPriceBaseline: {},
+    questTunePrimed: false,
+    unlockedAchievements: [],
     ...eventState,
   };
+  gameState.questPriceBaseline = { ...gameState.skuPrices };
   refreshDerivedModifiers(gameState);
   bootstrapUiAfterStateChange();
   finalizeSessionTelemetry();
@@ -3411,6 +3864,7 @@ async function initGameBody(options = {}, generation = initGameGeneration) {
     console.error("render after init failed", e);
     showTutorialShell(1);
   }
+  finalizeYandexGameBoot();
 }
 
 function defaultKpi() {
@@ -3524,8 +3978,38 @@ function applyLoadedState(raw) {
     lastDayEvent: raw.lastDayEvent && typeof raw.lastDayEvent === "object" ? raw.lastDayEvent : null,
     eventModifiers: raw.eventModifiers && typeof raw.eventModifiers === "object" ? raw.eventModifiers : emptyEventState().eventModifiers,
     crypto: normalizeCryptoState(raw.crypto, cryptoAssets),
+    luxury: normalizeLuxuryState(raw.luxury),
+    shopName: String(raw.shopName || ""),
+    shopNamePromptDone:
+      raw.shopNamePromptDone === true ||
+      !!String(raw.shopName || "").trim() ||
+      Math.max(1, Math.round(Number(raw.tutorialBeat) || 1)) > 1 ||
+      Math.max(1, Math.round(Number(raw.day) || 1)) > 1 ||
+      !!raw.lastDayReport,
+    simpleQuestStep: Math.max(1, Math.round(Number(raw.simpleQuestStep) || 1)),
+    simpleQuestCompleted:
+      raw.simpleQuestCompleted === true ||
+      (Math.max(1, Math.round(Number(raw.day) || 1)) >= 8 && !!raw.lastDayReport),
+    simpleQuestRewardsClaimed: Array.isArray(raw.simpleQuestRewardsClaimed)
+      ? raw.simpleQuestRewardsClaimed
+      : [],
+    questAdBaseline:
+      raw.questAdBaseline && typeof raw.questAdBaseline === "object"
+        ? {
+            enabled: raw.questAdBaseline.enabled === true,
+            budget: Math.max(0, Math.round(Number(raw.questAdBaseline.budget) || 0)),
+          }
+        : { enabled: false, budget: 0 },
+    questPriceBaseline:
+      raw.questPriceBaseline && typeof raw.questPriceBaseline === "object"
+        ? { ...raw.questPriceBaseline }
+        : { ...(raw.skuPrices || {}) },
+    questTunePrimed: raw.questTunePrimed === true,
+    unlockedAchievements: Array.isArray(raw.unlockedAchievements) ? raw.unlockedAchievements : [],
   };
+  ensureQuestTuneBaseline(gameState);
   gameState.eventModifiers = computeEventModifiers(gameState, eventDefinitions);
+  repairLegacyQualityFloorBug(gameState, progressionNodes);
   refreshDerivedModifiers(gameState);
   economyConstants = normalizeConstants(raw.economyConstants || economyConstants || defaultConstants);
   if (!categoryById(gameState.selectedCategoryId)) {
@@ -3538,6 +4022,8 @@ function applyLoadedState(raw) {
     if (gameState.promoOn[s.id] == null) gameState.promoOn[s.id] = false;
   }
   normalizeQualityScores(gameState);
+  consolidateIncomingShipments(gameState);
+  repairLuxuryOwnedPrices(gameState);
 
   return true;
 }
@@ -3555,24 +4041,252 @@ function countSkusByCategory() {
   return counts;
 }
 
+function formatEventTypeLabel(type) {
+  const t = String(type || "").toLowerCase();
+  if (t === "positive") return "позитивное";
+  if (t === "negative") return "негативное";
+  return type || "—";
+}
+
+function runAchievementCheck(ctx = {}) {
+  if (!gameState) return;
+  const newly = evaluateAchievements(gameState, {
+    ...ctx,
+    cryptoAssets,
+    progressionNodes,
+    progressionSynergies,
+  });
+  if (newly.length) enqueueAchievementPopups(newly);
+  if (isAchievementsOverlayOpen()) renderAchievementsOverlay(gameState);
+}
+
+/** Синхронизирует разблокировки без попапов (после загрузки сохранения). */
+function syncAchievementsSilent() {
+  if (!gameState) return;
+  evaluateAchievements(gameState, { cryptoAssets, progressionNodes, progressionSynergies });
+}
+
+function syncShopNameInputFromState() {
+  if (!gameState) return;
+  const locked = isShopNameLocked(gameState);
+  const name = getShopName(gameState);
+
+  if (els.shopNameDisplay instanceof HTMLElement) {
+    els.shopNameDisplay.textContent = name;
+    els.shopNameDisplay.hidden = !locked;
+  }
+
+  if (!(els.shopNameInput instanceof HTMLInputElement)) return;
+  if (!locked && document.activeElement === els.shopNameInput) return;
+
+  if (locked) {
+    els.shopNameInput.hidden = true;
+    els.shopNameInput.readOnly = true;
+    els.shopNameInput.tabIndex = -1;
+    els.shopNameInput.value = name;
+  } else {
+    els.shopNameInput.hidden = false;
+    const raw = String(gameState.shopName ?? "");
+    els.shopNameInput.value = raw || "";
+    els.shopNameInput.readOnly = false;
+    els.shopNameInput.tabIndex = 0;
+    els.shopNameInput.placeholder = name;
+  }
+}
+
+function commitShopNameFromInput() {
+  if (!(els.shopNameInput instanceof HTMLInputElement) || !gameState) return;
+  if (isShopNameLocked(gameState)) return;
+  const next = normalizeShopName(els.shopNameInput.value);
+  const hadCustom = hasCustomShopName(gameState);
+  gameState.shopName = els.shopNameInput.value.trim() ? next : "";
+  syncShopNameInputFromState();
+  renderAppTagline();
+  if (!hadCustom && hasCustomShopName(gameState)) runAchievementCheck();
+  autoSaveGame({ silent: true });
+}
+
+function beginTutorialAfterShopNameWelcome() {
+  if (!gameState) return;
+  if (Number(gameState.day) > 1 || gameState.lastDayReport) return;
+  gameState.onboardingHidden = false;
+  gameState.tutorialCompleted = false;
+  gameState.tutorialSkipped = false;
+  gameState.tutorialBeat = 1;
+  gameState.tutorialBeatLocked = true;
+}
+
+function completeShopNameWelcome(rawName) {
+  if (!gameState) return;
+  const trimmed = String(rawName || "").trim();
+  gameState.shopName = trimmed ? normalizeShopName(trimmed) : "";
+  markShopNamePromptDone(gameState);
+  closeShopNameWelcome();
+  beginTutorialAfterShopNameWelcome();
+  syncShopNameInputFromState();
+  renderAppTagline();
+  runAchievementCheck();
+  autoSaveGame({ silent: true });
+  render();
+  if (isTutorialActive(gameState)) {
+    showTutorialShell(resolveTutorialStep(gameState));
+  }
+}
+
+function maybeOpenShopNameWelcome() {
+  if (!gameState || gameState.shopNamePromptDone === true) return;
+  if (!needsShopNamePrompt(gameState) || isShopNameWelcomeOpen()) return;
+  openShopNameWelcome({
+    initialName: gameState.shopName || "",
+    onSubmit: (name) => completeShopNameWelcome(name),
+  });
+}
+
+function renderAppTagline() {
+  if (!(els.appTagline instanceof HTMLElement) || !gameState) return;
+  const shop = getShopName(gameState);
+  els.appTagline.textContent = `Магазин «${shop}» · закупки · реклама · KPI`;
+}
+
+function handleQuestCta(cta) {
+  if (!gameState) return;
+  if (cta === "advanceQuest") {
+    const step = resolveQuestStepIndex(gameState);
+    if (step === 5 && !hasQuestTuneChange(gameState)) {
+      toastWarn("Сначала измените рекламный бюджет или цену товара.");
+      return;
+    }
+    advanceQuestStep(gameState);
+    applyQuestRewardPayouts();
+    autoSaveGame({ silent: true });
+    render();
+    return;
+  }
+  if (cta === "finishQuest") {
+    if (isQuestCompleted(gameState)) return;
+    if (Number(gameState.cash) < 80_000) {
+      toastWarn("Для завершения обучения держите на счёте больше 80 000 ₽.");
+      return;
+    }
+    const stock = totalStock();
+    const incoming = gameState.incomingShipments?.length || 0;
+    if (stock <= 0 && !incoming) {
+      toastWarn("Завершите обучение, когда на складе или в пути есть товар.");
+      return;
+    }
+    completePlayerOnboarding();
+    applyQuestRewardPayouts();
+    runAchievementCheck();
+    toastSuccess("Стартовый квест пройден — открыты все разделы!");
+    autoSaveGame({ silent: true });
+    render();
+  }
+}
+
+function hideQuestSidebarPanel(panel) {
+  panel.hidden = true;
+  panel.style.display = "none";
+  panel.innerHTML = "";
+}
+
+function renderQuestSidebar() {
+  const panel = els.questSidebarPanel;
+  if (!(panel instanceof HTMLElement) || !gameState) return;
+  if (!isSimpleQuestActive(gameState)) {
+    hideQuestSidebarPanel(panel);
+    return;
+  }
+  const quest = getQuestStepContent(gameState);
+  if (!quest) {
+    hideQuestSidebarPanel(panel);
+    return;
+  }
+  panel.hidden = false;
+  panel.style.display = "";
+  const rewardLine =
+    quest.rewardRub > 0
+      ? quest.rewardClaimed
+        ? `<div class="quest-reward-line quest-reward-line--claimed">+${quest.rewardRub.toLocaleString("ru-RU")} ₽</div>`
+        : `<div class="quest-reward-line">+${quest.rewardRub.toLocaleString("ru-RU")} ₽</div>`
+      : "";
+  const ctaBlock = quest.cta
+    ? `<button type="button" class="btn-primary js-quest-cta header-quest-cta" data-cta="${quest.cta}">${quest.ctaLabel}</button>`
+    : `<p class="muted header-quest-wait">${quest.waitHint || "Следуйте подсказке на экране."}</p>`;
+  panel.innerHTML = `<h3>Квест · шаг ${quest.step}/${quest.totalSteps}</h3><strong class="header-quest-title">${quest.title}</strong>${rewardLine}<p class="muted header-quest-body">${quest.body}</p>${ctaBlock}`;
+}
+
+function afterDailyStoryEffects() {
+  const last = gameState?.lastDayEvent;
+  if (last?.story) {
+    showGameToast(last.story, {
+      type: last.type === "negative" ? "warn" : "success",
+      duration: 6500,
+    });
+  }
+  resolveQuestStepIndex(gameState);
+  applyQuestRewardPayouts();
+  runAchievementCheck({ lastEventId: last?.id });
+}
+
+function eventScopeLabel(event) {
+  if (event.skuId) return skuById(event.skuId)?.name || event.skuId;
+  if (event.categoryId) return categoryById(event.categoryId)?.name || event.categoryId;
+  return "весь магазин";
+}
+
+function eventToneClass(type) {
+  if (type === "positive") return "positive";
+  if (type === "negative") return "negative";
+  return "neutral";
+}
+
 function renderEventsPanel() {
   if (!els.eventsPanel) return;
   const poolSize = eventDefinitions.length;
   const active = gameState?.activeEvents || [];
   const last = gameState?.lastDayEvent;
   const pityLeft = Math.max(0, 6 - (gameState?.daysSinceLastEvent || 0));
+
+  if (isPlayerUi()) {
+    const parts = [];
+    if (last) {
+      const tone = eventToneClass(last.type);
+      parts.push(
+        `<p class="store-event-day-line store-event-day-line--${tone}">Сегодня: <b>${last.name}</b></p>`
+      );
+    }
+    if (active.length) {
+      parts.push(
+        active
+          .map((e) => {
+            const tone = eventToneClass(e.type);
+            const days = Math.max(0, Math.round(Number(e.remainingDays) || 0));
+            const daysLabel = days === 1 ? "1 день" : `${days} дн.`;
+            return `<div class="store-event-chip store-event-chip--${tone}"><span class="store-event-chip-name">${e.name}</span><span class="store-event-chip-meta">ещё ${daysLabel} · ${eventScopeLabel(e)}</span></div>`;
+          })
+          .join("")
+      );
+    }
+    if (!parts.length) {
+      els.eventsPanel.innerHTML = `<p class="store-events-empty">Спокойный рынок — без активных событий.</p>`;
+      return;
+    }
+    els.eventsPanel.innerHTML = parts.join("");
+    return;
+  }
+
   const activeRows = active.length
     ? active
         .map((e) => {
-          const scope = e.skuId ? `SKU ${e.skuId}` : e.categoryId ? `кат. ${e.categoryId}` : "глобально";
-          return `<li style="margin:4px 0"><b>${e.name}</b> (${e.type}) · ${scope} · осталось <b>${e.remainingDays}</b> дн.</li>`;
+          const scope = eventScopeLabel(e);
+          return `<li style="margin:4px 0"><b>${e.name}</b> (${formatEventTypeLabel(e.type)}) · ${scope} · осталось <b>${e.remainingDays}</b> дн.</li>`;
         })
         .join("")
     : `<li class="muted" style="margin:4px 0">Нет активных событий.</li>`;
   const lastLine = last
-    ? `Событие дня: <b>${last.name}</b> (${last.type})`
+    ? `Событие дня: <b>${last.name}</b> (${formatEventTypeLabel(last.type)})${last.story ? `<div style="margin-top:6px;color:#c9b8ff;font-size:13px">${last.story}</div>` : ""}`
     : `Событие дня: <span class="muted">не выпало</span>`;
-  els.eventsPanel.innerHTML = `<div class="muted">Пул событий: <b>${poolSize}</b>${poolSize >= 24 ? " (v3)" : poolSize >= 10 ? " (phase 2)" : ""} · pity через <b>${pityLeft}</b> дн. без события</div><div style="margin-top:6px">${lastLine}</div><div style="margin-top:8px"><b>Активные эффекты</b><ul class="incoming">${activeRows}</ul></div>`;
+  els.eventsPanel.innerHTML = `<div class="muted">Пул событий: <b>${poolSize}</b> · гарант события через <b>${pityLeft}</b> дн. без события</div><div style="margin-top:6px">${lastLine}</div><div style="margin-top:8px"><b>Активные эффекты</b><ul class="incoming">${activeRows}</ul></div>`;
 }
 
 function buildPhase2FreezeReport() {
@@ -3754,11 +4468,11 @@ function bootstrapUiAfterStateChange() {
   resetMerchDom();
   fillCategoryFilterSelect();
   fillSkuSelect();
-  if (els.skuSelect?.options.length) els.skuSelect.value = gameState.skus[0]?.id || "";
   syncAdUiFromState();
   syncCostModelUiFromState();
   syncReturnsUiFromState();
   syncSkuFiltersUiFromState();
+  syncAchievementsSilent();
   renderSdkStatus();
   buildMerchTableOnce();
   renderMerchQualitySlots();
@@ -4010,40 +4724,53 @@ function importGameFromJsonFile(file) {
 
 function nextDay(options = {}) {
   if (!canAdvanceDayDuringTutorial(gameState)) return;
-  if (isDayTransitionPlaying()) return;
+  if (nextDayBusy || isDayTransitionPlaying()) return;
+  nextDayBusy = true;
   const silent = options.silent === true;
-  readCostModelFromUi();
-  gameState.day += 1;
-  if (isCryptoExchangeUnlocked(gameState)) {
-    advanceCryptoMarket(gameState, cryptoAssets);
+  try {
+    readCostModelFromUi();
+    gameState.day += 1;
+    syncNextDayFabState();
+    if (isCryptoExchangeUnlocked(gameState)) {
+      advanceCryptoMarket(gameState, cryptoAssets);
+    }
+    processDailyEvents(gameState, eventDefinitions);
+    afterDailyStoryEffects();
+    refreshDerivedModifiers(gameState);
+    const prog = gameState.progressionModifiers || {};
+    if (prog.autoReprice) runAutoReprice(gameState);
+    if (prog.autoReorder) runAutoReorder(gameState);
+    gameState.lastMorningArrivals = processIncomingShipments();
+    gameState.adBudgetEffective = getEffectiveAdBudget();
+    const simCfg = buildSimulationConstants();
+    simulateSalesDay(gameState, simCfg);
+    refreshDerivedModifiers(gameState);
+    syncOnboardingProgress(gameState, onboardingSteps);
+    pushKpiHistorySnapshot();
+    gameState.progressionPoints = (gameState.progressionPoints || 0) + PROGRESSION_POINT_PER_DAY;
+    updateServiceCauseHistory();
+    pushDailyTelemetry(gameState);
+    syncVisitMetrics(gameState);
+    runAchievementCheck();
+    autoSaveGame({ silent: true });
+    render();
+    if (!silent) {
+      void playDayTransition({
+        day: gameState.day,
+        profit: gameState.lastDayReport ? Number(gameState.kpi?.profit) : null,
+      }).finally(() => {
+        nextDayBusy = false;
+      });
+    } else {
+      nextDayBusy = false;
+    }
+    void tryShowInterstitialAfterDay();
+    console.log("Day advanced", gameState);
+  } catch (err) {
+    nextDayBusy = false;
+    console.error("nextDay failed", err);
+    throw err;
   }
-  processDailyEvents(gameState, eventDefinitions);
-  refreshDerivedModifiers(gameState);
-  const prog = gameState.progressionModifiers || {};
-  if (prog.autoReprice) runAutoReprice(gameState);
-  if (prog.autoReorder) runAutoReorder(gameState);
-  gameState.lastMorningArrivals = processIncomingShipments();
-  // День 9: рекламный бюджет учитывается в модели только когда реклама включена.
-  gameState.adBudgetEffective = getEffectiveAdBudget();
-  const simCfg = buildSimulationConstants();
-  simulateSalesDay(gameState, simCfg);
-  refreshDerivedModifiers(gameState);
-  syncOnboardingProgress(gameState, onboardingSteps);
-  pushKpiHistorySnapshot();
-  gameState.progressionPoints = (gameState.progressionPoints || 0) + PROGRESSION_POINT_PER_DAY;
-  updateServiceCauseHistory();
-  pushDailyTelemetry(gameState);
-  syncVisitMetrics(gameState);
-  autoSaveGame({ silent: true });
-  render();
-  if (!silent) {
-    void playDayTransition({
-      day: gameState.day,
-      profit: gameState.lastDayReport ? Number(gameState.kpi?.profit) : null,
-    });
-  }
-  void tryShowInterstitialAfterDay();
-  console.log("Day advanced", gameState);
 }
 
 function resetGame() {
@@ -4088,12 +4815,48 @@ function minPurchaseCost() {
   return costs.length ? Math.min(...costs) : 0;
 }
 
-function isDeadlockState() {
-  const noStock = totalStock() <= 0;
-  const noIncoming = gameState.incomingShipments.length === 0;
+function cryptoHoldingsValue() {
+  if (!gameState?.crypto || !cryptoAssets.length || !isCryptoExchangeUnlocked(gameState)) return 0;
+  return getCryptoPortfolioSummary(gameState, cryptoAssets).holdingsValue || 0;
+}
+
+function analyzeDeadlockSituation() {
   const minCost = minPurchaseCost();
   const cannotBuyMin = minCost <= 0 ? false : gameState.cash < minCost;
-  return noStock && noIncoming && cannotBuyMin;
+  const noStock = totalStock() <= 0;
+  const noIncoming = gameState.incomingShipments.length === 0;
+  const cryptoVal = cryptoHoldingsValue();
+  const rescuesLeft = Math.max(0, MAX_RESCUES_PER_RUN - (gameState.rescuesUsed || 0));
+  const deadlock = cannotBuyMin && noStock && noIncoming && cryptoVal < minCost;
+
+  if (deadlock) {
+    return {
+      deadlock: true,
+      rescuesLeft,
+      minCost,
+      message: `<span style="color:#ffb36b"><b>Обнаружен риск тупика:</b> нет остатков и поставок в пути, на счёте недостаточно для минимальной закупки (${money(minCost)}), продать криптовалюту нельзя или её мало.</span>`,
+    };
+  }
+
+  const hints = [];
+  if (!cannotBuyMin) hints.push("на счёте хватает на минимальную закупку");
+  if (!noStock) hints.push("на складе есть товар — можно продавать и зарабатывать");
+  if (!noIncoming) hints.push("есть поставки в пути");
+  if (cannotBuyMin && cryptoVal >= minCost) {
+    hints.push(`на криптобирже портфель ~${money(cryptoVal)} — <b>продайте монеты</b>, чтобы пополнить счёт`);
+  }
+  const hintLine = hints.length ? ` Причина: ${hints.join("; ")}.` : "";
+
+  return {
+    deadlock: false,
+    rescuesLeft,
+    minCost,
+    message: `Тупик не обнаружен.${hintLine} Минимальная закупка: <b>${money(minCost)}</b> · Использовано авансов: <b>${gameState.rescuesUsed || 0}</b>/<b>${MAX_RESCUES_PER_RUN}</b>.`,
+  };
+}
+
+function isDeadlockState() {
+  return analyzeDeadlockSituation().deadlock;
 }
 
 function useRescue() {
@@ -4112,16 +4875,20 @@ function useRescue() {
 
 function render() {
   if (!gameState) return;
-  syncTutorialCompletion(gameState);
+  maybeOpenShopNameWelcome();
+  if (syncTutorialCompletion(gameState)) hideTutorialSpotlight();
   const onboardingView = resolveOnboarding(gameState, onboardingSteps);
-  const beginnerTier = resolveBeginnerTier(gameState, onboardingView);
+  let beginnerTier = resolveBeginnerTier(gameState, onboardingView);
+  if (isSimpleQuestActive(gameState) && !isTutorialActive(gameState)) {
+    beginnerTier = Math.min(beginnerTier, questBeginnerTierCap(gameState));
+  }
   const isDevUi = typeof document !== "undefined" && document.body.dataset.uiMode === "dev";
   const tutorialStep = resolveTutorialStep(gameState);
   const tutorialOn = isTutorialActive(gameState) && !isDevUi && tutorialStep > 0;
 
   if (tutorialOn) {
     const content = getTutorialContent(tutorialStep, gameState);
-    applyTutorialUi(tutorialStep, tutorialVisibleSections(tutorialStep), tutorialChromeFromContent(content));
+    applyTutorialUi(tutorialStep, filterTutorialVisibleSections(tutorialStep, isDevUi), tutorialChromeFromContent(content));
   } else {
     applyBeginnerUi(beginnerTier, isDevUi);
     renderBeginnerTeaser(beginnerTier);
@@ -4129,64 +4896,18 @@ function render() {
   }
   syncTutorialCardVisibility(isDevUi);
 
-  const salesLine = gameState.lastDayReport
-    ? `Итог последнего Next Day: выручка <b>${Math.round(gameState.kpi.revenue).toLocaleString("ru-RU")}</b> · прибыль <b>${Math.round(gameState.kpi.profit).toLocaleString("ru-RU")}</b> · маржа <b>${gameState.kpi.marginPct.toFixed(1)}%</b> · ACOS <b>${(gameState.kpi.acos * 100).toFixed(1)}%</b> · возвраты <b>${(gameState.kpi.returnPct * 100).toFixed(1)}%</b> · ${formatStockoutSummaryLine(gameState.kpi.unmetUnits, gameState.kpi.stockoutRate * 100)} · запас ~<b>${gameState.kpi.daysOfStock.toFixed(1)}</b> дн. (оценка по чистым продажам)`
-    : `Итог дня: <span style="color:#a9acb7">симуляция ещё не запускалась — нажми Next Day</span>`;
-
-  els.summary.innerHTML =
-    tutorialOn || (beginnerTier < 3 && !isDevUi)
-      ? [
-          `День <b>${gameState.day}</b> · На счёте: <b>${gameState.cash.toLocaleString("ru-RU")} ₽</b>`,
-          `На складе: <b>${totalStock()}</b> шт.${gameState.incomingShipments.length ? ` · В пути: <b>${gameState.incomingShipments.length}</b>` : ""}`,
-          gameState.lastDayReport
-            ? `Прибыль за последний день: <b>${Math.round(gameState.kpi.profit).toLocaleString("ru-RU")} ₽</b>`
-            : `<span class="muted">Продаж ещё не было — закупите товар и нажмите «Следующий день».</span>`,
-        ].join("<br/>")
-      : [
-    `День: <b>${gameState.day}</b>`,
-    `Кэш: <b>${gameState.cash.toLocaleString("ru-RU")}</b>`,
-    `Реклама: <b>${gameState.adEnabled === false ? "выкл" : "вкл"}</b> · бюджет <b>${gameState.adBudget.toLocaleString("ru-RU")}</b>/день · в модели <b>${getEffectiveAdBudget().toLocaleString("ru-RU")}</b>`,
-    `Категорий: <b>${(gameState.categories || []).length}</b> · SKU в каталоге: <b>${gameState.skus.length}</b> · событий в пуле: <b>${eventDefinitions.length}</b>`,
-    `Категория (фильтр): <b>${categoryById(gameState.selectedCategoryId)?.name || gameState.selectedCategoryId}</b> · SKU в категории: <b>${getVisibleSkus().length}</b>`,
-    `Остаток (всего): <b>${totalStock()}</b>`,
-    `Поставок в пути: <b>${gameState.incomingShipments.length}</b>`,
-    `Прогрессия: очки <b>${gameState.progressionPoints || 0}</b> · узлов <b>${progressionNodes.filter((n) => gameState.progressionUnlocked?.[n.id]).length}/${progressionNodes.length}</b> · ЗП команды <b>${money(gameState.teamDailyCost || 0)}</b>/день`,
-    `Стиль игры: <b>${gameState.playStyleId ? playStyleById(gameState.playStyleId)?.name || gameState.playStyleId : "не выбран"}</b> · антиэксплойт: <b>${gameState.antiExploit?.status || "—"}</b>`,
-    `Анти-тупик: использовано авансов <b>${gameState.rescuesUsed || 0}</b>/<b>${MAX_RESCUES_PER_RUN}</b>`,
-    lastAutoSaveStatus.ok
-      ? `Автосохранение: <b>день ${lastAutoSaveStatus.day ?? gameState.day}</b>${lastAutoSaveStatus.at ? ` · ${new Date(lastAutoSaveStatus.at).toLocaleTimeString("ru-RU")}` : ""} · local <b>${lastAutoSaveStatus.localOk ? "OK" : "ERR"}</b> · cloud <b>${lastAutoSaveStatus.cloudSource}</b> <b>${lastAutoSaveStatus.cloudSkipped ? "—" : lastAutoSaveStatus.cloudOk ? "OK" : "ERR"}</b>`
-      : `<span style="color:#ff8f8f">Автосохранение: ошибка</span>`,
-    salesLine,
-  ].join("<br/>");
-  if (els.serviceRating) {
-    if (!gameState.lastDayReport?.totals) {
-      els.serviceRating.textContent = "Рейтинг сервиса появится после первой симуляции.";
-    } else {
-      const sr = Number(gameState.lastDayReport.totals.serviceRating ?? gameState.kpi?.serviceRating ?? 5);
-      const sp = Number(gameState.lastDayReport.totals.servicePenalty || 0);
-      const color = sr >= 4.2 ? "#8fd694" : sr >= 3.6 ? "#ffcc66" : "#ff8f8f";
-      const si = Number(gameState.lastDayReport.totals.serviceStockoutImpact || 0);
-      const ri = Number(gameState.lastDayReport.totals.serviceReturnsImpact || 0);
-      els.serviceRating.innerHTML = `<span style="color:${color}"><b>Рейтинг сервиса:</b> ${sr.toFixed(2)} / 5</span> · штраф ${money(sp)} / день · вклад: ${STOCKOUT_CAUSE} ${si.toFixed(2)} + возвраты ${ri.toFixed(2)}`;
-    }
-  }
-  if (els.serviceDiagnostics) {
-    if (!gameState.lastDayReport?.totals) {
-      els.serviceDiagnostics.textContent = "Диагностика причины просадки появится после первой симуляции.";
-    } else {
-      const diagnosisLine = buildServiceDiagnosisLine(gameState.lastDayReport.totals);
-      const trendLine = buildServiceTrendLine();
-      const trendBadges = buildServiceTrendBadges();
-      const selectedDayDetails = buildServiceSelectedDayDetails();
-      const badgesBlock = trendBadges ? `<br/><span class="muted">${trendBadges}</span>` : "";
-      const detailsBlock = selectedDayDetails ? `<br/><span class="muted">${selectedDayDetails}</span>` : "";
-      els.serviceDiagnostics.innerHTML = `${diagnosisLine}<br/><span class="muted">${trendLine}</span>${badgesBlock}${detailsBlock}`;
-    }
-  }
+  renderSummarySidebar();
+  renderServiceRatingSidebar();
+  renderServiceDiagnosticsSidebar();
   renderServiceDiagCompare();
+  renderQuestSidebar();
+  syncShopNameInputFromState();
+  renderAppTagline();
   renderProgressionPanel();
   syncNextDayFabState();
   syncCryptoBtnState();
+  syncLuxuryBtnState();
+  if (isLuxuryOverlayOpen()) renderLuxuryOverlayContent();
   if (isCryptoOverlayOpen()) renderCryptoOverlayContent();
   renderCampaignReadability();
   renderPhase2BuildStatus();
@@ -4205,10 +4926,7 @@ function render() {
   syncSkuFiltersUiFromState();
   buildMerchTableOnce();
   renderMerchQualitySlots();
-  renderIncoming();
-  renderMorningArrivals();
-  renderStockTable();
-  renderYesterday();
+  renderIncomingSidebar();
   renderDeadlockGuard();
   renderKpiCharts();
   renderKpiDashboard();
@@ -4247,6 +4965,12 @@ els.merchRoot.addEventListener("input", (e) => {
   if (!id || !gameState) return;
   if (el.classList.contains("js-price")) {
     gameState.skuPrices[id] = Math.max(1, Number(el.value) || 0);
+    const sku = skuById(id);
+    const hint = els.merchRoot.querySelector(`.js-price-hint[data-sku-id="${id}"]`);
+    if (hint instanceof HTMLElement && sku) {
+      hint.innerHTML = priceDeltaHint(gameState.skuPrices[id], sku.recommendedPrice);
+    }
+    renderQuestSidebar();
   }
 });
 
@@ -4290,12 +5014,20 @@ els.adBudgetRange.addEventListener("input", () => {
   if (!gameState) return;
   gameState.adBudget = Math.max(0, Number(els.adBudgetRange.value) || 0);
   syncAdUiFromState();
+  renderQuestSidebar();
 });
 
 els.adEnabledToggle?.addEventListener("change", () => {
   if (!gameState || !(els.adEnabledToggle instanceof HTMLInputElement)) return;
   gameState.adEnabled = els.adEnabledToggle.checked;
   syncAdUiFromState();
+  renderQuestSidebar();
+});
+
+els.serviceDiagnosticsToggle?.addEventListener("click", () => {
+  if (!gameState?.lastDayReport?.totals) return;
+  serviceDiagHintsOpen = !serviceDiagHintsOpen;
+  syncServiceDiagnosticsVisibility();
 });
 
 els.serviceDiagnostics?.addEventListener("click", (e) => {
@@ -4335,8 +5067,12 @@ els.runRegression7Btn?.addEventListener("click", () => {
 els.hideOnboardingBtn?.addEventListener("click", hideOnboarding);
 els.showAllSectionsBtn?.addEventListener("click", expandAllPlayerSections);
 els.skipTutorialBtn?.addEventListener("click", skipTutorial);
-els.quickStartBtn?.addEventListener("click", quickStartBuy);
 els.buyBtn?.addEventListener("click", purchase);
+els.skuSelect?.addEventListener("change", () => {
+  renderBuySkuPreview();
+  updateBuyHint();
+});
+els.qtyInput?.addEventListener("input", updateBuyHint);
 els.onboardingPanel?.addEventListener("click", (e) => {
   const btn = e.target instanceof HTMLElement ? e.target.closest(".js-beginner-cta") : null;
   if (!(btn instanceof HTMLElement)) return;
@@ -4345,6 +5081,13 @@ els.onboardingPanel?.addEventListener("click", (e) => {
   if (btn.dataset.cta === "nextDay") nextDay();
   if (btn.dataset.cta === "finishTutorial") finishTutorial();
 });
+els.questSidebarPanel?.addEventListener("click", (e) => {
+  const btn = e.target instanceof HTMLElement ? e.target.closest(".js-quest-cta") : null;
+  if (!(btn instanceof HTMLElement)) return;
+  handleQuestCta(btn.dataset.cta || "");
+});
+els.shopNameInput?.addEventListener("change", commitShopNameFromInput);
+els.shopNameInput?.addEventListener("blur", commitShopNameFromInput);
 bindTutorialSpotlightActions(handleTutorialCta);
 els.runRegression14Btn?.addEventListener("click", () => runRegressionDays(14));
 els.runRegression28Btn?.addEventListener("click", () => runRegressionDays(28));
@@ -4429,7 +5172,17 @@ els.returnRateModRange?.addEventListener("input", () => {
   syncReturnsUiFromState();
 });
 
-els.nextDayBtn.addEventListener("click", nextDay);
+function handleNextDayClick(e) {
+  e.preventDefault();
+  nextDay();
+}
+
+if (els.nextDayBtn instanceof HTMLButtonElement) {
+  if (els.nextDayBtn.dataset.bound !== "1") {
+    els.nextDayBtn.dataset.bound = "1";
+    els.nextDayBtn.addEventListener("click", handleNextDayClick);
+  }
+}
 els.saveBtn?.addEventListener("click", saveGame);
 els.loadBtn?.addEventListener("click", loadGame);
 els.exportJsonBtn?.addEventListener("click", exportGameToJsonFile);
@@ -4477,19 +5230,15 @@ els.categoryFilterSelect?.addEventListener("change", () => {
   if (!gameState || !els.categoryFilterSelect) return;
   gameState.selectedCategoryId = String(els.categoryFilterSelect.value || "");
   resetMerchDom();
-  fillSkuSelect();
-  if (els.skuSelect.options.length) els.skuSelect.value = els.skuSelect.options[0].value;
   render();
 });
 const onSkuFilterChange = () => {
   if (!gameState) return;
   applySkuFiltersFromUi();
   resetMerchDom();
-  fillSkuSelect();
-  if (els.skuSelect.options.length) els.skuSelect.value = els.skuSelect.options[0].value;
-  renderStockTable();
   buildMerchTableOnce();
-  updateBuyHint();
+  renderKpiDashboard();
+  renderKpiAlertsPanel();
 };
 els.skuStockFilterSelect?.addEventListener("change", onSkuFilterChange);
 els.skuSearchInput?.addEventListener("input", onSkuFilterChange);
@@ -4501,17 +5250,50 @@ els.qolPresetsPanel?.addEventListener("click", (e) => {
   const presetId = btn.dataset.presetId;
   if (presetId) applyQolPreset(presetId);
 });
-els.skuSelect.addEventListener("change", updateBuyHint);
-els.qtyInput.addEventListener("input", updateBuyHint);
 
 /** Dev-console API (ES modules не выставляют gameState в global scope). */
 function exposeDevApi() {
   if (typeof window === "undefined") return;
+  if (new URLSearchParams(window.location.search).get("dev") !== "1") return;
   window.mssim = {
     getState: () => gameState,
     nextDay: () => nextDay(),
     render: () => render(),
     unlockNode: (nodeId) => unlockProgressionNode(String(nodeId)),
+    /** Разблокировать криптобиржу без требований и оплаты. Консоль: mssim.unlockCrypto() */
+    unlockCrypto: () => {
+      if (!gameState) return false;
+      if (!gameState.progressionUnlocked) gameState.progressionUnlocked = {};
+      if (gameState.progressionUnlocked[CRYPTO_EXCHANGE_NODE_ID] === true) return true;
+      gameState.progressionUnlocked[CRYPTO_EXCHANGE_NODE_ID] = true;
+      refreshDerivedModifiers();
+      autoSaveGame({ silent: true });
+      render();
+      toastSuccess("Криптобиржа открыта — кнопка ₿ в шапке теперь активна.");
+      return true;
+    },
+    /** Открыть всю ветку «Команда» без оплаты. Консоль: mssim.unlockTeam() */
+    unlockTeam: () => {
+      if (!gameState) return false;
+      if (!gameState.progressionUnlocked) gameState.progressionUnlocked = {};
+      const teamIds = progressionNodes.filter((n) => n.branch === "team").map((n) => n.id);
+      let added = 0;
+      for (const id of teamIds) {
+        if (gameState.progressionUnlocked[id] !== true) {
+          gameState.progressionUnlocked[id] = true;
+          added += 1;
+        }
+      }
+      refreshDerivedModifiers();
+      autoSaveGame({ silent: true });
+      render();
+      toastSuccess(
+        added > 0
+          ? `Команда открыта: +${added} ролей (всего ${teamIds.length} в ветке).`
+          : `Ветка «Команда» уже полностью открыта (${teamIds.length} ролей).`
+      );
+      return { teamIds, added, dailySalary: computeTeamDailySalary(gameState, progressionNodes) };
+    },
     /** Быстрый найм Контент-менеджера (n22) для теста ЗП. */
     cheatHireContentManager: () => {
       if (!gameState) return;
@@ -4525,6 +5307,15 @@ function exposeDevApi() {
       if (!gameState) return;
       gameState.cash += Math.max(0, Number(amount) || 0);
       render();
+    },
+    /** +1 000 000 ₽ на счёт. Консоль: mssim.cheatMillion() */
+    cheatMillion: () => {
+      if (!gameState) return false;
+      gameState.cash += 1_000_000;
+      autoSaveGame({ silent: true });
+      render();
+      toastSuccess("На счёт зачислено 1 000 000 ₽");
+      return gameState.cash;
     },
     addProgressionPoints: (n) => {
       if (!gameState) return;
@@ -4868,7 +5659,11 @@ function exposeDevApi() {
         mssim._test.assert("D99 step 1", mssim.getTutorialStep() === 1);
         mssim._test.assert("D99 spotlight root", !!document.getElementById("tutorialSpotlightRoot"));
         const visible = [...document.querySelectorAll("[data-ui-section]")].filter(
-          (el) => getComputedStyle(el).display !== "none" && !el.hidden
+          (el) =>
+            getComputedStyle(el).display !== "none" &&
+            !el.hidden &&
+            el.getAttribute("data-ui-section") !== "summary" &&
+            el.getAttribute("data-ui-section") !== "incoming"
         );
         mssim._test.assert("D99 few sections start", visible.length <= 2);
         mssim._test.advanceTutorial();
@@ -4876,7 +5671,8 @@ function exposeDevApi() {
         mssim._test.quickStart();
         mssim._test.assert("D99 after buy step 4", mssim.getTutorialStep() === 4);
         mssim._test.advanceTutorial();
-        mssim.nextDay();
+        mssim._test.assert("D99 next-day explain step 5", mssim.getTutorialStep() === 5);
+        mssim._test.advanceTutorial();
         mssim._test.assert("D99 after sim step 6", mssim.getTutorialStep() === 6);
         let guard = 0;
         while (mssim.isTutorialActive() && mssim.getTutorialStep() < 11 && guard++ < 12) {
@@ -4899,7 +5695,7 @@ function exposeDevApi() {
         });
         mssim._test.assert("D96 dev panels hidden", hidden.length >= 12);
         mssim._test.assert("D97 next day btn", !!document.getElementById("nextDayBtn"));
-        mssim._test.assert("D97 quick start visible", !!document.getElementById("quickStartBtn"));
+        mssim._test.assert("D97 buy button visible", !!document.getElementById("buyBtn"));
         const dumpCard = document.getElementById("stateDump")?.closest("[data-dev-only]");
         mssim._test.assert(
           "D97 state debug hidden",
@@ -4926,9 +5722,42 @@ initCryptoOverlay({
     render();
   },
 });
+initLuxuryOverlay({
+  getContext: () => ({ state: gameState, catalog: luxuryCatalog }),
+  canOpen: () => isLuxuryShopUnlocked(gameState) && !isTutorialActive(gameState),
+  onOpen: () => renderLuxuryOverlayContent(),
+  onPurchase: () => {
+    autoSaveGame({ silent: true });
+    render();
+  },
+});
+window.addEventListener("luxury-buy-success", (e) => {
+  const item = e.detail?.item;
+  const status = e.detail?.status;
+  if (!item) return;
+  runAchievementCheck();
+  const statusLine = status?.title ? ` Статус: «${status.title}».` : "";
+  toastSuccess(`Куплено: ${item.name} за ${money(item.price)} ₽.${statusLine}`);
+});
+window.addEventListener("luxury-buy-error", (e) => {
+  toastWarn(luxuryBuyErrorMessage(e.detail?.error, e.detail));
+});
+window.addEventListener("luxury-sell-success", (e) => {
+  const item = e.detail?.item;
+  const resale = e.detail?.resale;
+  const status = e.detail?.status;
+  if (!item) return;
+  runAchievementCheck();
+  const statusLine = status?.title ? ` Статус: «${status.title}».` : "";
+  toastSuccess(`Продано: ${item.name} за ${money(resale)} ₽.${statusLine}`);
+});
+window.addEventListener("luxury-sell-error", (e) => {
+  toastWarn(luxurySellErrorMessage(e.detail?.error));
+});
 window.addEventListener("crypto-trade-success", (e) => {
   const d = e.detail;
   if (!d?.ok) return;
+  runAchievementCheck();
   if (d.side === "sell") {
     const pnl = Number(d.pnl) || 0;
     const pnlTxt = pnl >= 0 ? `Прибыль +${money(pnl)} ₽` : `Убыток ${money(pnl)} ₽`;
@@ -4948,4 +5777,6 @@ initGameMenu({
     renderSupportChannels();
   },
 });
+initAchievementsOverlay({ getState: () => gameState });
+initShopNameWelcome({ onSubmit: (name) => completeShopNameWelcome(name) });
 initGame();

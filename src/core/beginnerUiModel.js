@@ -35,9 +35,9 @@ export function getNextPlayerAction(state, onboardingView) {
       step: 1,
       totalSteps: 3,
       title: "Закупите первый товар",
-      body: "Без товара на складе продаж не будет. Нажмите «Стартовая закупка» — мы купим популярный товар за вас. Или выберите товар вручную ниже.",
-      cta: "quickStart",
-      ctaLabel: "Стартовая закупка",
+      body: "Без товара на складе продаж не будет. Выберите товар в блоке «Закупка» и нажмите «Закупить».",
+      cta: null,
+      ctaLabel: null,
     };
   }
   if (!state.lastDayReport) {
@@ -70,12 +70,14 @@ export function getNextPlayerAction(state, onboardingView) {
 
 /**
  * @param {1|2|3|4} tier
+ * @param {number} [day] — игровой день; с 3-го тизер скрывается целиком
  */
-export function beginnerTeaserText(tier) {
-  if (tier >= 4) return "";
+export function beginnerTeaserText(tier, day = 1) {
+  const d = Math.max(1, Math.round(Number(day) || 1));
+  if (tier >= 4 || d >= 3) return "";
   const lines = [];
   if (tier < 2) lines.push("После закупки откроются реклама и статус поставок.");
-  if (tier < 3) lines.push("После первого дня откроются KPI, склад и настройка цен.");
-  if (tier < 4) lines.push("На 3-й день — стили игры, события и прогрессия.");
+  if (tier < 3) lines.push("После первого дня откроются KPI и настройка цен с остатками.");
+  if (tier < 4 && d < 3) lines.push("На 3-й день — стили игры, события и прогрессия.");
   return lines.join(" ");
 }

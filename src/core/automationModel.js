@@ -1,3 +1,5 @@
+import { addIncomingShipment } from "./incomingShipmentModel.js";
+
 /**
  * Auto-reprice: мягко подтягивает цены к recommendedPrice (±8%).
  * @param {object} state
@@ -44,16 +46,17 @@ export function runAutoReorder(state) {
     const lead = Math.max(0, Math.round(Number(sku.leadTimeDays) || 0));
     const extra =
       Number(state.eventModifiers?.purchaseLeadTimeExtraByCategory?.[String(sku.categoryId || "beauty")]) || 0;
-    state.incomingShipments = state.incomingShipments || [];
-    state.incomingShipments.push({
+    const arrivalDay = (Number(state.day) || 0) + lead + extra;
+    const cost = qty * unitCost;
+    addIncomingShipment(state, {
       id: `auto_${Date.now()}_${id}_${Math.random().toString(36).slice(2, 6)}`,
       skuId: String(id),
       qty,
       orderDay: state.day,
-      arrivalDay: (Number(state.day) || 0) + lead + extra,
+      arrivalDay,
+      totalCost: cost,
       auto: true,
     });
-    const cost = qty * unitCost;
     spent += cost;
     orders += 1;
   }

@@ -44,7 +44,7 @@ export function getKpiAlerts(state) {
     alerts.push({
       id: "alert_acos",
       severity: "medium",
-      title: "Высокий ACOS",
+      title: "Высокая доля рекламы (ACOS)",
       text: `ACOS ${(Number(k.acos) * 100).toFixed(0)}% при слабой марже — снизьте бюджет или поднимите конверсию.`,
     });
   }

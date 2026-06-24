@@ -15,8 +15,8 @@
   },
   {
     "id": "qol_restock",
-    "label": "Быстрый restock",
-    "desc": "Экстренное пополнение top SKU",
+    "label": "Быстрое пополнение",
+    "desc": "Экстренная закупка ходовых товаров",
     "action": "quick_restock"
   },
   {
@@ -27,7 +27,7 @@
   },
   {
     "id": "qol_recovery",
-    "label": "Safe recovery v2",
+    "label": "Безопасное восстановление",
     "desc": "Пресет против дефицита на складе",
     "action": "safe_recovery"
   }

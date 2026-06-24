@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Симулятор продавца маркетплейса</title>
+    <link rel="icon" href="./assets/store/icon-512.png" type="image/png" />
     <meta name="description" content="Экономический симулятор продавца на маркетплейсе — Яндекс Игры" />
     <style>
       :root { color-scheme: dark; }
@@ -51,12 +52,414 @@
         min-width: 120px;
       }
       label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #a9acb7; }
+      .field-label { font-size: 12px; color: #a9acb7; }
+      .ad-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 18px;
+        align-items: center;
+        margin-top: 6px;
+      }
+      .ad-toggle-wrap { flex-shrink: 0; }
+      .ad-budget-field { flex: 1; min-width: 220px; }
+      .ad-budget-value {
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        color: #c9b8ff;
+        white-space: nowrap;
+        padding-bottom: 2px;
+      }
+      .ad-budget-field--off .game-range { opacity: 0.45; }
+      .ad-budget-field--off .ad-budget-value { color: #6d7080; }
+      .game-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .game-toggle input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+      }
+      .game-toggle-track {
+        position: relative;
+        width: 46px;
+        height: 26px;
+        flex-shrink: 0;
+        border-radius: 999px;
+        background: #2b2e3a;
+        border: 1px solid #3a3f52;
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+        transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .game-toggle-thumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: linear-gradient(145deg, #d8d9de, #8b8f9c);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+      }
+      .game-toggle input:checked + .game-toggle-track {
+        background: linear-gradient(90deg, #5a3fbf, #7a4cff);
+        border-color: #9b7aff;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 12px rgba(122, 76, 255, 0.25);
+      }
+      .game-toggle input:checked + .game-toggle-track .game-toggle-thumb {
+        transform: translateX(20px);
+        background: linear-gradient(145deg, #fff, #e8e0ff);
+        box-shadow: 0 2px 8px rgba(122, 76, 255, 0.45);
+      }
+      .game-toggle input:focus-visible + .game-toggle-track {
+        outline: 2px solid rgba(122, 76, 255, 0.55);
+        outline-offset: 2px;
+      }
+      .game-toggle-label {
+        font-size: 14px;
+        color: #e7e7ea;
+        font-weight: 600;
+      }
+      .game-toggle:has(input:not(:checked)) .game-toggle-label { color: #8b8f9c; }
+      .game-range-wrap { padding: 6px 2px 4px; }
+      input[type="range"].game-range {
+        --range-pct: 0%;
+        -webkit-appearance: none;
+        appearance: none;
+        display: block;
+        width: 100%;
+        height: 24px;
+        margin: 0;
+        background: transparent;
+        cursor: pointer;
+      }
+      input[type="range"].game-range::-webkit-slider-runnable-track {
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          #7a4cff 0%,
+          #9b7aff var(--range-pct),
+          #252836 var(--range-pct),
+          #252836 100%
+        );
+        border: 1px solid #3a3f52;
+        box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+      }
+      input[type="range"].game-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px;
+        height: 22px;
+        margin-top: -7px;
+        border-radius: 50%;
+        background: linear-gradient(145deg, #d4c4ff 0%, #7a4cff 52%, #5a3fbf 100%);
+        border: 2px solid #f0ebff;
+        box-shadow:
+          0 2px 10px rgba(122, 76, 255, 0.5),
+          0 0 0 4px rgba(122, 76, 255, 0.1);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+      input[type="range"].game-range:hover::-webkit-slider-thumb {
+        box-shadow:
+          0 3px 14px rgba(122, 76, 255, 0.62),
+          0 0 0 5px rgba(122, 76, 255, 0.14);
+      }
+      input[type="range"].game-range:active::-webkit-slider-thumb {
+        transform: scale(1.06);
+      }
+      input[type="range"].game-range:focus-visible::-webkit-slider-thumb {
+        box-shadow:
+          0 2px 10px rgba(122, 76, 255, 0.5),
+          0 0 0 3px rgba(122, 76, 255, 0.45);
+      }
+      input[type="range"].game-range::-moz-range-track {
+        height: 10px;
+        border-radius: 999px;
+        background: #252836;
+        border: 1px solid #3a3f52;
+        box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.35);
+      }
+      input[type="range"].game-range::-moz-range-progress {
+        height: 10px;
+        border-radius: 999px 0 0 999px;
+        background: linear-gradient(90deg, #7a4cff, #9b7aff);
+      }
+      input[type="range"].game-range::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid #f0ebff;
+        background: linear-gradient(145deg, #d4c4ff 0%, #7a4cff 52%, #5a3fbf 100%);
+        box-shadow: 0 2px 10px rgba(122, 76, 255, 0.5);
+      }
       ul.incoming { margin: 8px 0 0; padding-left: 20px; }
       ul.incoming li { margin-bottom: 4px; }
+      .team-role-tip {
+        cursor: help;
+        border-bottom: 1px dotted rgba(201, 184, 255, 0.45);
+      }
+      .team-role-tip:hover,
+      .team-role-tip:focus-visible {
+        color: #e8e0ff;
+        border-bottom-color: #7a4cff;
+        outline: none;
+      }
       table.stock { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
       table.stock th, table.stock td { border: 1px solid #2b2e3a; padding: 6px 8px; text-align: left; }
       table.stock th { color: #a9acb7; font-weight: 600; }
       table.stock td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+      .sku-thumb-wrap {
+        flex: 0 0 auto;
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        padding: 2px;
+        background: linear-gradient(145deg, var(--sku-thumb-ring, #7a4cff), rgba(122, 76, 255, 0.15));
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+      }
+      .sku-thumb-wrap .sku-thumb {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 10px;
+        object-fit: cover;
+      }
+      .merch-product {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .merch-product-compact {
+        gap: 10px;
+      }
+      .merch-product-compact .sku-thumb-wrap {
+        width: 40px;
+        height: 40px;
+        border-radius: 9px;
+      }
+      .merch-product-compact .sku-thumb-wrap .sku-thumb {
+        border-radius: 7px;
+      }
+      .merch-product-text {
+        min-width: 0;
+      }
+      .merch-product-name {
+        font-weight: 600;
+        color: #ececf2;
+        line-height: 1.25;
+      }
+      .merch-product-meta {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #a9acb7;
+        line-height: 1.35;
+      }
+      .merch-tier {
+        color: #c9b8ff;
+        font-weight: 600;
+      }
+      .merch-sku-id {
+        display: inline-block;
+        margin-left: 6px;
+        font-size: 10px;
+        color: #7a8194;
+      }
+      .merch-table tbody tr.merch-row {
+        transition: background 0.12s ease;
+      }
+      .merch-table tbody tr.merch-row:hover {
+        background: rgba(122, 76, 255, 0.06);
+      }
+      .merch-product-cell {
+        min-width: 220px;
+      }
+      .merch-price-cell {
+        min-width: 168px;
+        vertical-align: middle;
+      }
+      .merch-price-editor {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .merch-price-input {
+        width: 96px !important;
+        min-width: 96px !important;
+        font-weight: 600;
+        text-align: right;
+      }
+      .merch-price-currency {
+        color: #a9acb7;
+        font-size: 13px;
+      }
+      .merch-rec-btn {
+        padding: 5px 10px !important;
+        font-size: 11px !important;
+        border-radius: 6px !important;
+      }
+      .price-hint {
+        display: inline-block;
+        margin-top: 6px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .price-hint-ok { color: #8fd694; }
+      .price-hint-high { color: #ff8f8f; }
+      .price-hint-low { color: #ffcc66; }
+      .merch-stock-cell {
+        min-width: 72px;
+        vertical-align: middle;
+        text-align: right;
+      }
+      .merch-stock-qty {
+        display: inline-block;
+        font-weight: 700;
+        font-size: 14px;
+        font-variant-numeric: tabular-nums;
+        color: #d8dae3;
+      }
+      .merch-stock-qty.merch-stock--low {
+        color: #ffcc66;
+      }
+      .merch-stock-qty.merch-stock--empty {
+        color: #ff8f8f;
+      }
+      .merch-quality-cell {
+        min-width: 190px;
+        vertical-align: middle;
+      }
+      .quality-meter {
+        height: 6px;
+        border-radius: 999px;
+        background: #252836;
+        overflow: hidden;
+        margin-bottom: 8px;
+        border: 1px solid #2b2e3a;
+      }
+      .quality-meter-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.25s ease, background 0.25s ease;
+      }
+      .quality-level-badge {
+        display: inline-block;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .merch-upgrade-btn {
+        display: block;
+        margin-top: 8px;
+        padding: 5px 10px !important;
+        font-size: 11px !important;
+        border-radius: 6px !important;
+        max-width: 100%;
+        text-align: left;
+        white-space: normal;
+      }
+      .merch-promo-cell {
+        vertical-align: middle;
+        text-align: center;
+      }
+      .merch-promo-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .merch-promo-toggle input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .merch-promo-ui {
+        width: 38px;
+        height: 22px;
+        border-radius: 999px;
+        background: #3a3f52;
+        border: 1px solid #4a5068;
+        position: relative;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+      .merch-promo-ui::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        background: #d8dae3;
+        transition: transform 0.15s ease, background 0.15s ease;
+      }
+      .merch-promo-toggle input:checked + .merch-promo-ui {
+        background: rgba(122, 76, 255, 0.55);
+        border-color: #7a4cff;
+      }
+      .merch-promo-toggle input:checked + .merch-promo-ui::after {
+        transform: translateX(16px);
+        background: #fff;
+      }
+      .merch-promo-label {
+        font-size: 12px;
+        color: #a9acb7;
+      }
+      .merch-ad-bar {
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #2b2e3a;
+        background: rgba(0, 0, 0, 0.16);
+      }
+      .merch-ad-bar-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      .merch-ad-bar-head strong {
+        font-size: 13px;
+        color: #e7e7ea;
+      }
+      .merch-ad-bar-head .muted {
+        font-size: 12px;
+      }
+      .merch-ad-bar .ad-controls {
+        margin-top: 0;
+      }
+      @media (max-width: 720px) {
+        .merch-table thead {
+          display: none;
+        }
+        .merch-table tbody tr.merch-row {
+          display: block;
+          margin-bottom: 12px;
+          border: 1px solid #2b2e3a;
+          border-radius: 12px;
+          padding: 10px;
+          background: #181b23;
+        }
+        .merch-table tbody tr.merch-row td {
+          display: block;
+          border: none;
+          padding: 8px 0;
+        }
+        .merch-promo-cell {
+          text-align: left;
+        }
+      }
       .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 8px; }
       .kpi-card { border: 1px solid #2b2e3a; border-radius: 8px; background: #181b23; padding: 10px; }
       .kpi-title { color: #a9acb7; font-size: 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
@@ -168,9 +571,889 @@
       }
       body[data-ui-mode="player"] [data-dev-only] { display: none !important; }
       body[data-ui-mode="player"] .app-shell {
-        padding-bottom: 104px;
+        padding-bottom: 24px;
+        max-width: 1180px;
+      }
+      .app-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+      .store-sidebar-column {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+      }
+      .store-sidebar {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .store-sidebar-column .next-day-fab {
+        position: static;
+        width: 100%;
+        flex-shrink: 0;
+        right: auto;
+        bottom: auto;
+        z-index: 1;
+      }
+      .store-sidebar-column .next-day-btn,
+      .store-sidebar-column .next-day-btn-inner {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      @media (min-width: 920px) {
+        .app-layout {
+          grid-template-columns: minmax(0, 1fr) 288px;
+        }
+        .app-layout-main {
+          min-width: 0;
+        }
+        .store-sidebar-column {
+          position: sticky;
+          top: 12px;
+          align-self: start;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          width: 100%;
+          min-width: 0;
+          height: calc(100vh - 44px);
+          height: calc(100dvh - 44px);
+          max-height: calc(100vh - 44px);
+          max-height: calc(100dvh - 44px);
+        }
+        .store-sidebar {
+          position: static;
+          flex: 1 1 auto;
+          min-height: 0;
+          height: auto;
+          max-height: none;
+          margin-bottom: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+          overscroll-behavior: contain;
+          scrollbar-gutter: stable;
+          padding-bottom: 16px;
+          box-sizing: border-box;
+        }
+        body[data-ui-mode="player"] .store-sidebar {
+          padding-bottom: 16px;
+        }
+        .store-sidebar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .store-sidebar::-webkit-scrollbar-thumb {
+          background: rgba(122, 76, 255, 0.35);
+          border-radius: 4px;
+        }
+        .store-sidebar::-webkit-scrollbar-thumb:hover {
+          background: rgba(122, 76, 255, 0.55);
+        }
+      }
+      .app-layout-main {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      .store-name-display {
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+        font-size: clamp(1.05rem, 2.4vw, 1.38rem);
+        font-weight: 700;
+        line-height: 1.25;
+        color: #f2ecff;
+        text-shadow: 0 0 28px rgba(122, 76, 255, 0.32);
+        margin: 0 0 14px;
+        word-break: break-word;
+        letter-spacing: -0.02em;
+      }
+      .store-name-input--edit {
+        width: 100%;
+        margin: 0 0 14px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+        font-size: clamp(1.05rem, 2.4vw, 1.38rem);
+        font-weight: 700;
+        line-height: 1.25;
+        color: #f2ecff;
+        outline: none;
+      }
+      .store-name-input--edit::placeholder { color: #6d7080; }
+      .store-incoming-panel {
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #2b2e3a;
+      }
+      .store-incoming-panel h3 {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #c9b8ff;
+      }
+      .store-incoming-empty {
+        font-size: 12px;
+        line-height: 1.4;
+        color: #6d7080;
+      }
+      .store-incoming-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .store-incoming-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 8px;
+        border-radius: 10px;
+        border: 1px solid #2b2e3a;
+        background: linear-gradient(145deg, rgba(34, 26, 56, 0.55) 0%, rgba(27, 29, 37, 0.9) 100%);
+      }
+      .store-incoming-item .sku-thumb-wrap {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+      }
+      .store-incoming-item .sku-thumb-wrap .sku-thumb {
+        width: 40px;
+        height: 40px;
+      }
+      .store-incoming-body { min-width: 0; flex: 1; }
+      .store-incoming-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #e7e7ea;
+        line-height: 1.3;
+      }
+      .store-incoming-qty {
+        font-size: 12px;
+        color: #a9acb7;
+        margin-top: 2px;
+      }
+      .store-incoming-eta {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #8fd694;
+      }
+      .store-incoming-eta--soon { color: #ffcc66; }
+      .store-service-card {
+        margin-bottom: 14px;
+        padding: 12px 12px 10px;
+        border-radius: 12px;
+        border: 1px solid #3a3f52;
+        background: linear-gradient(155deg, rgba(42, 31, 74, 0.45) 0%, rgba(27, 29, 37, 0.95) 58%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+      .store-service-card--pending {
+        border-style: dashed;
+        background: rgba(27, 29, 37, 0.65);
+      }
+      .store-service-card--good { border-color: rgba(143, 214, 148, 0.35); }
+      .store-service-card--warn { border-color: rgba(255, 204, 102, 0.35); }
+      .store-service-card--bad { border-color: rgba(255, 143, 143, 0.35); }
+      .store-service-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .store-service-card-kicker {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #c9b8ff;
+      }
+      .store-service-stars {
+        display: inline-flex;
+        gap: 2px;
+        font-size: 11px;
+        line-height: 1;
+      }
+      .store-service-star { color: #3a3f52; }
+      .store-service-star--on { color: #ffcc66; text-shadow: 0 0 8px rgba(255, 204, 102, 0.35); }
+      .store-service-card--good .store-service-star--on { color: #8fd694; text-shadow: 0 0 8px rgba(143, 214, 148, 0.35); }
+      .store-service-score {
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+        font-size: 1.65rem;
+        font-weight: 700;
+        line-height: 1.1;
+        color: var(--service-score-color, #f2ecff);
+        margin-bottom: 10px;
+      }
+      .store-service-score-max {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #8b8f9c;
+        margin-left: 2px;
+      }
+      .store-service-metrics {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .store-service-metric {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(43, 46, 58, 0.85);
+      }
+      .store-service-metric dt {
+        margin: 0;
+        font-size: 11px;
+        color: #a9acb7;
+        font-weight: 500;
+      }
+      .store-service-metric dd {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 700;
+        color: #e7e7ea;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+      .store-service-metric--penalty dd { color: #ff8f8f; }
+      .store-service-metric--stockout dd { color: #ffcc66; }
+      .store-service-metric--returns dd { color: #c9b8ff; }
+      .store-service-card-placeholder {
+        font-size: 12px;
+        line-height: 1.4;
+        margin: 2px 0 0;
+      }
+      .store-service-hints {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #2b2e3a;
+      }
+      .store-service-hints-toggle {
+        width: 100%;
+        padding: 9px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 10px;
+        border: 1px solid #3a3f52;
+        background: linear-gradient(145deg, #2a2540 0%, #1f2230 100%);
+        color: #d8cffc;
+      }
+      .store-service-hints-toggle:hover:not(:disabled) {
+        border-color: #7a4cff;
+        color: #f0ebff;
+      }
+      .store-service-hints-toggle:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .store-service-hints-panel {
+        margin-top: 10px;
+        padding: 10px 10px 8px;
+        border-radius: 10px;
+        border: 1px solid #2b2e3a;
+        background: rgba(0, 0, 0, 0.22);
+        font-size: 12px;
+        line-height: 1.45;
+        color: #a9acb7;
+      }
+      .store-service-hints-panel[hidden] { display: none !important; }
+      .store-service-hint-line + .store-service-hint-line {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(43, 46, 58, 0.75);
+      }
+      .store-sidebar-title {
+        margin: 0 0 10px;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .store-summary-panel {
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #2b2e3a;
+      }
+      .store-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .store-summary-stat {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(43, 46, 58, 0.85);
+      }
+      .store-summary-stat-label {
+        font-size: 12px;
+        color: #a9acb7;
+        font-weight: 500;
+      }
+      .store-summary-stat-value {
+        font-size: 15px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #ececf2;
+        text-align: right;
+      }
+      .store-summary-stat-value--cash { color: #c9b8ff; }
+      .store-summary-stat-value--profit-positive { color: #8fd694; }
+      .store-summary-stat-value--profit-negative { color: #ff8f8f; }
+      .store-summary-hint {
+        margin: 2px 0 0;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #8b8f9c;
+      }
+      .store-summary-divider {
+        height: 1px;
+        margin: 4px 0 2px;
+        background: #2b2e3a;
+      }
+      .store-summary-subhead {
+        margin: 0 0 2px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #8b8f9c;
+      }
+      .store-morning-block {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #2b2e3a;
+      }
+      .store-morning-title {
+        margin: 0 0 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #8fd694;
+      }
+      .store-morning-line {
+        font-size: 12px;
+        line-height: 1.4;
+        color: #c9d8cc;
+      }
+      .store-morning-line + .store-morning-line {
+        margin-top: 4px;
+      }
+      .store-name-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+      }
+      .store-name-field input {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #3a3f52;
+        background: #1b1d25;
+        color: #e7e7ea;
+        font-size: 14px;
+      }
+      .store-sidebar-rating {
+        margin-top: 4px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .store-sidebar-quest {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #2b2e3a;
+      }
+      .header-quest-panel.store-sidebar-quest {
+        margin-top: 0;
+        padding-top: 8px;
+        border-top: none;
+      }
+      .store-sidebar-quest h3 {
+        margin: 0 0 6px;
+        font-size: 13px;
+        color: #c9b8ff;
+      }
+      .store-sidebar-quest .btn-primary {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      .store-events-panel {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #2b2e3a;
+      }
+      .store-events {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .store-events-empty {
+        margin: 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #8b8f9c;
+        background: rgba(0, 0, 0, 0.14);
+        border: 1px solid #2b2e3a;
+      }
+      .store-event-day-line {
+        margin: 0 0 4px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #d8dae3;
+        background: rgba(122, 76, 255, 0.08);
+        border: 1px solid rgba(122, 76, 255, 0.22);
+      }
+      .store-event-day-line--positive {
+        background: rgba(143, 214, 148, 0.08);
+        border-color: rgba(143, 214, 148, 0.28);
+      }
+      .store-event-day-line--negative {
+        background: rgba(255, 143, 143, 0.08);
+        border-color: rgba(255, 143, 143, 0.28);
+      }
+      .store-event-chip {
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #2b2e3a;
+        background: rgba(0, 0, 0, 0.18);
+      }
+      .store-event-chip--positive {
+        border-color: rgba(143, 214, 148, 0.35);
+      }
+      .store-event-chip--negative {
+        border-color: rgba(255, 143, 143, 0.35);
+      }
+      .store-event-chip-name {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #ececf2;
+        line-height: 1.3;
+      }
+      .store-event-chip-meta {
+        display: block;
+        margin-top: 3px;
+        font-size: 11px;
+        color: #8b8f9c;
+      }
+      .store-events-dev {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #7a8194;
+        line-height: 1.35;
+      }
+      .quest-reward-line {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #8fd694;
+        font-weight: 700;
+      }
+      .quest-reward-line--claimed {
+        color: #6a9a6e;
+        font-weight: 500;
+      }
+      .buy-panel {
+        border: 1px solid #3a3f52;
+        background: linear-gradient(145deg, #1c1f2a 0%, #171923 55%);
+      }
+      .buy-panel-lead { margin: 0 0 12px; font-size: 13px; }
+      .buy-panel-layout {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 14px;
+        align-items: start;
+      }
+      @media (max-width: 520px) {
+        .buy-panel-layout { grid-template-columns: 1fr; }
+      }
+      .buy-sku-preview {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #2b2e3a;
+        background: rgba(0, 0, 0, 0.2);
+        min-width: 108px;
+      }
+      .buy-sku-preview-name {
+        font-size: 12px;
+        text-align: center;
+        color: #c9b8ff;
+        line-height: 1.3;
+        max-width: 120px;
+      }
+      .buy-panel-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-end;
+      }
+      .buy-panel-form .field { flex: 1; min-width: 140px; }
+      .buy-panel-form #buyBtn { min-width: 120px; }
+      .buy-panel-hint {
+        margin: 10px 0 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(122, 76, 255, 0.1);
+        border: 1px solid rgba(122, 76, 255, 0.25);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .achievement-popup-root {
+        position: fixed;
+        right: 16px;
+        bottom: 96px;
+        z-index: 12050;
+        pointer-events: none;
+        max-width: min(360px, calc(100vw - 32px));
+      }
+      .achievement-popup {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #1f2433 0%, #171923 60%);
+        border: 1px solid #5a3fbf;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        transform: translateX(120%);
+        opacity: 0;
+        transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .achievement-popup--visible {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      .achievement-popup--hide {
+        transform: translateX(40px);
+        opacity: 0;
+      }
+      .achievement-popup-glow {
+        position: absolute;
+        inset: -40%;
+        background: radial-gradient(circle at 20% 50%, rgba(122, 76, 255, 0.35), transparent 55%);
+        animation: achievement-glow 1.8s ease-in-out infinite alternate;
+        pointer-events: none;
+      }
+      @keyframes achievement-glow {
+        from { opacity: 0.5; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1.05); }
+      }
+      .achievement-popup-icon {
+        font-size: 36px;
+        line-height: 1;
+        flex-shrink: 0;
+        animation: achievement-icon-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+        position: relative;
+        z-index: 1;
+      }
+      @keyframes achievement-icon-pop {
+        from { transform: scale(0.3) rotate(-12deg); opacity: 0; }
+        to { transform: scale(1) rotate(0); opacity: 1; }
+      }
+      .achievement-popup-body { position: relative; z-index: 1; min-width: 0; }
+      .achievement-popup-kicker {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #c9b8ff;
+        margin-bottom: 2px;
+      }
+      .achievement-popup-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .achievement-popup-desc {
+        font-size: 12px;
+        color: #a9acb7;
+        line-height: 1.35;
+      }
+      #achievementsOverlay .achievements-modal {
+        max-width: 480px;
+        max-height: min(80vh, 640px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #achievementsOverlay #achievementsList {
+        flex: 1 1 auto;
+        min-height: 0;
+        margin-top: 12px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: 4px;
+      }
+      #achievementsOverlay .achievements-modal .feedback-modal-header {
+        flex-shrink: 0;
+      }
+      .achievement-row {
+        display: flex;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #2b2e3a;
+        align-items: flex-start;
+      }
+      .achievement-row:last-child { border-bottom: none; }
+      .achievement-row--locked { opacity: 0.55; }
+      .achievement-row-icon {
+        font-size: 26px;
+        line-height: 1;
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: rgba(122, 76, 255, 0.12);
+      }
+      .achievement-row-title { font-weight: 600; font-size: 14px; }
+      .achievement-row-badge { color: #8fd694; }
+      .achievement-row-desc { font-size: 12px; margin-top: 2px; }
+      .achievement-row-tier { font-size: 11px; margin-top: 4px; }
+      body.achievements-open .app-shell {
+        filter: blur(2px);
+        pointer-events: none;
+      }
+      #shopNameWelcomeOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 13150;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      #shopNameWelcomeOverlay[hidden] { display: none !important; }
+      .shop-welcome-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 9, 14, 0.82);
+        backdrop-filter: blur(4px);
+      }
+      .shop-welcome-modal {
+        position: relative;
+        width: min(420px, 100%);
+        padding: 24px 22px 20px;
+        border-radius: 14px;
+        border: 1px solid #5a3fbf;
+        background: linear-gradient(160deg, #221838 0%, #171923 58%);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+        animation: shop-welcome-in 0.32s ease-out;
+      }
+      @keyframes shop-welcome-in {
+        from { opacity: 0; transform: translateY(12px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .shop-welcome-modal h2 {
+        margin: 0 0 8px;
+        font-size: 1.35rem;
+      }
+      .shop-welcome-modal .shop-welcome-lead {
+        margin: 0 0 16px;
+        font-size: 14px;
+        line-height: 1.45;
+        color: #a9acb7;
+      }
+      .shop-welcome-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .shop-welcome-field input {
+        width: 100%;
+        padding: 11px 12px;
+        border-radius: 10px;
+        border: 1px solid #3a3f52;
+        background: #12141c;
+        color: #e7e7ea;
+        font-size: 16px;
+      }
+      .shop-welcome-field input:focus {
+        outline: none;
+        border-color: #7a4cff;
+        box-shadow: 0 0 0 2px rgba(122, 76, 255, 0.25);
+      }
+      .shop-welcome-hint {
+        font-size: 12px;
+        color: #8b90a0;
+      }
+      .shop-name-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 0 0 14px;
+      }
+      .shop-name-suggestion-chip {
+        border: 1px solid #3a3f52;
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: #1b1d25;
+        color: #c9b8ff;
+        font-size: 12px;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease;
+      }
+      .shop-name-suggestion-chip:hover {
+        border-color: #7a4cff;
+        background: #221838;
+      }
+      .shop-name-suggestion-chip.is-selected {
+        border-color: #7a4cff;
+        background: rgba(122, 76, 255, 0.22);
+        color: #efeaff;
+      }
+      .shop-name-input--locked {
+        opacity: 0.92;
+        cursor: default;
+        background: #15171e;
+        border-style: dashed;
+      }
+      .shop-name-lock-hint {
+        font-size: 11px;
+        line-height: 1.35;
+        margin-top: 4px;
+      }
+      body.shop-welcome-open .app-shell,
+      body.shop-welcome-open .game-menu-fab,
+      body.shop-welcome-open .next-day-fab {
+        pointer-events: none;
+      }
+      body.shop-welcome-open .app-shell {
+        filter: blur(3px);
       }
       .app-header { margin-bottom: 12px; }
+      .app-header-layout {
+        display: flex;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .app-header-main {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .app-header-main h1 {
+        margin: 0 0 4px;
+      }
+      .app-header-aside {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        flex: 0 0 min(360px, 36%);
+        min-width: 220px;
+        max-width: 400px;
+      }
+      .app-header-aside .game-menu-fab {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: 2;
+      }
+      .app-header-aside:has(.header-quest-panel:not([hidden])) .game-menu-fab {
+        top: 2px;
+        right: 2px;
+      }
+      .header-quest-panel[hidden],
+      #questSidebarPanel[hidden] {
+        display: none !important;
+      }
+      .header-quest-panel {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        align-self: stretch;
+        min-height: 100%;
+        margin: 0;
+        padding: 10px 44px 10px 12px;
+        border: 1px solid #4a3f7a;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #2a1f4a 0%, #1b1d25 65%);
+        box-sizing: border-box;
+      }
+      .header-quest-panel h3 {
+        margin: 0 0 4px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #c9b8ff;
+        white-space: nowrap;
+      }
+      .header-quest-panel .header-quest-title {
+        display: block;
+        font-size: 13px;
+        line-height: 1.25;
+      }
+      .header-quest-panel .header-quest-body {
+        margin: 4px 0 0;
+        font-size: 11px;
+        line-height: 1.35;
+        flex: 1 1 auto;
+      }
+      .header-quest-panel .quest-reward-line {
+        margin-top: 2px;
+        font-size: 12px;
+      }
+      .header-quest-panel .header-quest-cta {
+        margin-top: auto;
+        width: 100%;
+        font-size: 12px;
+        padding: 8px 10px;
+        flex-shrink: 0;
+      }
+      .header-quest-panel .header-quest-wait {
+        margin-top: auto;
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+      @media (max-width: 719px) {
+        .app-header-layout {
+          flex-direction: column;
+        }
+        .app-header-aside {
+          width: 100%;
+          min-width: 0;
+          max-width: none;
+          flex: none;
+          min-height: 0;
+        }
+        .app-header-aside .game-menu-fab {
+          position: absolute;
+          top: 0;
+          right: 0;
+        }
+        .header-quest-panel {
+          min-height: 0;
+          padding-right: 44px;
+        }
+      }
       .player-toolbar { margin-bottom: 0; }
       .beginner-hero {
         border: 1px solid #5a3fbf;
@@ -192,6 +1475,28 @@
         box-shadow: 0 0 0 3px #8fd694, 0 0 18px rgba(143, 214, 148, 0.45);
         animation: tutorial-pulse 1.4s ease-in-out infinite;
       }
+      body.tutorial-spotlight-open .tutorial-highlight {
+        position: relative;
+        z-index: 10005;
+      }
+      body.tutorial-spotlight-open .next-day-fab.tutorial-highlight {
+        position: static;
+      }
+      .store-summary-panel.tutorial-highlight {
+        border-radius: 12px;
+        background: rgba(122, 76, 255, 0.07);
+        box-shadow:
+          0 0 0 2px rgba(122, 76, 255, 0.55),
+          0 0 0 5px #8fd694,
+          0 0 24px rgba(143, 214, 148, 0.42);
+      }
+      .store-incoming-panel.tutorial-highlight {
+        border-radius: 12px;
+        box-shadow:
+          0 0 0 2px rgba(122, 76, 255, 0.55),
+          0 0 0 5px #8fd694,
+          0 0 24px rgba(143, 214, 148, 0.42);
+      }
       .tutorial-locked {
         opacity: 0.38;
         cursor: not-allowed;
@@ -202,7 +1507,17 @@
       }
       body.tutorial-spotlight-interactive .tutorial-highlight {
         position: relative;
-        z-index: 10001;
+        z-index: 10005;
+        pointer-events: auto;
+      }
+      body.tutorial-spotlight-interactive .next-day-fab.tutorial-highlight {
+        position: static;
+      }
+      body.tutorial-spotlight-interactive .tutorial-spotlight-backdrop {
+        pointer-events: none;
+      }
+      body.tutorial-spotlight-interactive .tutorial-spotlight-popover {
+        z-index: 10006;
       }
       body.tutorial-spotlight-interactive .next-day-fab,
       body.tutorial-spotlight-open .next-day-fab {
@@ -270,6 +1585,24 @@
         padding: 16px 18px;
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
         animation: tutorial-pop-in 0.28s ease-out;
+      }
+      .tutorial-spotlight-popover--compact {
+        padding: 12px 14px;
+      }
+      .tutorial-spotlight-popover--compact .tutorial-spotlight-title {
+        font-size: 1rem;
+        margin-bottom: 6px;
+      }
+      .tutorial-spotlight-popover--compact .tutorial-spotlight-body {
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .tutorial-spotlight-popover--compact .tutorial-spotlight-tips {
+        max-height: 132px;
+        overflow-y: auto;
+        font-size: 12px;
+        margin-bottom: 8px;
+        padding-right: 4px;
       }
       @keyframes tutorial-pop-in {
         from { opacity: 0; transform: translateY(8px) scale(0.98); }
@@ -356,6 +1689,35 @@
         opacity: 0.52;
         cursor: not-allowed;
       }
+      .btn-luxury {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-luxury-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        background: rgba(201, 184, 255, 0.2);
+        color: #c9b8ff;
+        font-size: 12px;
+        line-height: 1;
+      }
+      .btn-luxury.luxury-locked:disabled,
+      .btn-luxury:disabled {
+        opacity: 0.52;
+        cursor: not-allowed;
+      }
+      .luxury-btn-wrap {
+        display: inline-flex;
+        vertical-align: middle;
+      }
+      .luxury-btn-wrap .btn-luxury:disabled {
+        pointer-events: none;
+      }
       .crypto-btn-wrap {
         display: inline-flex;
         vertical-align: middle;
@@ -363,7 +1725,13 @@
       .crypto-btn-wrap .btn-crypto:disabled {
         pointer-events: none;
       }
-      body[data-ui-mode="player"] [data-ui-section="progression"] {
+      body[data-ui-mode="player"] [data-ui-section="progression"],
+      body[data-ui-mode="player"] [data-ui-section="styles"],
+      body[data-ui-mode="player"] [data-ui-section="team"],
+      body[data-ui-mode="player"] [data-ui-section="campaign"],
+      body[data-ui-mode="player"] [data-ui-section="cost"],
+      body[data-ui-mode="player"] [data-ui-section="rescue"],
+      body[data-ui-mode="player"] [data-ui-section="platform"] {
         display: none !important;
       }
       body.upgrades-open .app-shell {
@@ -375,6 +1743,328 @@
         pointer-events: none;
         filter: brightness(0.42);
         transition: filter 0.22s ease;
+      }
+      body.luxury-open .app-shell {
+        pointer-events: none;
+        filter: brightness(0.42);
+        transition: filter 0.22s ease;
+      }
+      #luxuryOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 12800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      #luxuryOverlay[hidden] {
+        display: none !important;
+      }
+      .luxury-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(8, 9, 14, 0.78);
+        backdrop-filter: blur(2px);
+      }
+      .luxury-modal {
+        position: relative;
+        z-index: 1;
+        width: min(960px, 100%);
+        max-height: min(92vh, 760px);
+        overflow: auto;
+        background: linear-gradient(165deg, #1e1828 0%, #12141c 50%, #101820 100%);
+        border: 1px solid #8a6cff;
+        border-radius: 14px;
+        padding: 16px 18px 18px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+        transition: opacity 0.22s ease, transform 0.22s ease;
+      }
+      .luxury-modal-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      .luxury-modal-header h2 {
+        margin: 0 0 4px;
+        font-size: 1.15rem;
+      }
+      #luxuryOverlayMeta {
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .luxury-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 14px;
+      }
+      .luxury-tab {
+        border: 1px solid #3a3f52;
+        background: #1a1d28;
+        color: #a9acb7;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+      }
+      .luxury-tab:hover {
+        border-color: #6b4cff;
+        color: #efeaff;
+      }
+      .luxury-tab--active {
+        border-color: #7a4cff;
+        background: rgba(122, 76, 255, 0.18);
+        color: #efeaff;
+      }
+      .luxury-tab-badge {
+        display: inline-block;
+        margin-left: 4px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: rgba(122, 76, 255, 0.35);
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .luxury-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .luxury-card {
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid #2b2e3a;
+        border-radius: 12px;
+        background: #181b23;
+        transition: border-color 0.12s ease, background 0.12s ease;
+        cursor: pointer;
+      }
+      .luxury-card:hover {
+        border-color: #4a3f68;
+        background: #1c1f2a;
+      }
+      .luxury-card--owned {
+        border-color: rgba(122, 76, 255, 0.35);
+        background: rgba(122, 76, 255, 0.06);
+      }
+      .luxury-card-art {
+        flex-shrink: 0;
+      }
+      .luxury-visual {
+        display: block;
+        border-radius: 10px;
+      }
+      .luxury-visual--photo {
+        width: 88px;
+        height: 88px;
+        object-fit: cover;
+        background: #181b23;
+      }
+      .luxury-card-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .luxury-card-name {
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+      .luxury-card-desc {
+        font-size: 11px;
+        line-height: 1.4;
+        margin-bottom: 6px;
+      }
+      .luxury-card-spec {
+        font-size: 11px;
+        line-height: 1.35;
+        margin-bottom: 4px;
+        color: #8fd694;
+      }
+      .luxury-card-price {
+        font-weight: 700;
+        font-size: 13px;
+        color: #d8dae3;
+        margin-bottom: 4px;
+      }
+      .luxury-card-day {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+      .luxury-card-actions {
+        margin-top: 6px;
+      }
+      .luxury-buy-btn {
+        width: 100%;
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+      }
+      .luxury-buy-btn--disabled {
+        opacity: 0.55;
+      }
+      .luxury-sell-btn {
+        width: 100%;
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+        border-color: rgba(255, 143, 143, 0.35) !important;
+        color: #ffc9c9 !important;
+      }
+      .luxury-sell-btn:hover {
+        border-color: rgba(255, 143, 143, 0.55) !important;
+        background: rgba(255, 143, 143, 0.08) !important;
+      }
+      .luxury-owned-badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        color: #8fd694;
+        padding: 5px 8px;
+        border-radius: 6px;
+        background: rgba(143, 214, 148, 0.1);
+        border: 1px solid rgba(143, 214, 148, 0.25);
+      }
+      .luxury-empty {
+        margin: 16px 0 4px;
+        text-align: center;
+      }
+      body.luxury-open .next-day-fab,
+      body.luxury-open .game-menu-fab {
+        pointer-events: none;
+        opacity: 0.35;
+      }
+      #luxuryDetailOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 12900;
+        display: flex;
+        flex-direction: column;
+      }
+      #luxuryDetailOverlay[hidden] {
+        display: none !important;
+      }
+      .luxury-detail-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(4, 5, 10, 0.92);
+        backdrop-filter: blur(4px);
+      }
+      .luxury-detail-panel {
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-height: 100vh;
+        overflow: auto;
+        background: linear-gradient(180deg, #12141c 0%, #0e1018 100%);
+        opacity: 0;
+        transform: translateY(16px);
+        transition: opacity 0.24s ease, transform 0.24s ease;
+      }
+      .luxury-detail-panel.luxury-detail-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .luxury-detail-art {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: min(42vh, 360px);
+        max-height: 50vh;
+        padding: 48px 24px 16px;
+        background: radial-gradient(ellipse at center, #1a2030 0%, #0e1018 70%);
+      }
+      .luxury-detail-art .luxury-visual--photo {
+        width: min(92vw, 480px);
+        height: min(42vh, 360px);
+        max-width: 100%;
+        object-fit: contain;
+        border-radius: 14px;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+      }
+      .luxury-detail-art .luxury-visual {
+        width: min(280px, 70vw);
+        height: min(280px, 70vw);
+      }
+      .luxury-detail-body {
+        flex: 1;
+        padding: 8px 20px 28px;
+        max-width: 560px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      .luxury-detail-body h2 {
+        margin: 0 0 8px;
+        font-size: 1.35rem;
+      }
+      .luxury-detail-desc {
+        margin: 0 0 16px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .luxury-detail-specs {
+        list-style: none;
+        margin: 0 0 16px;
+        padding: 0;
+        border: 1px solid #2b2e3a;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .luxury-detail-specs li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 14px;
+        font-size: 13px;
+        border-bottom: 1px solid #252836;
+      }
+      .luxury-detail-specs li:last-child {
+        border-bottom: none;
+      }
+      .luxury-detail-specs li:nth-child(odd) {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .luxury-detail-specs span:first-child {
+        color: #8a8f9e;
+      }
+      .luxury-detail-specs span:last-child {
+        font-weight: 600;
+        text-align: right;
+      }
+      .luxury-detail-meta {
+        margin-bottom: 16px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .luxury-detail-price {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #efeaff;
+        margin-bottom: 4px;
+      }
+      .luxury-detail-actions .luxury-buy-btn,
+      .luxury-detail-actions .luxury-sell-btn {
+        width: 100%;
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+      }
+      .luxury-card-owned-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        color: #8fd694;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(143, 214, 148, 0.12);
+        margin-left: 6px;
+        vertical-align: middle;
       }
       #cryptoOverlay {
         position: fixed;
@@ -488,19 +2178,21 @@
         z-index: 1;
         width: min(960px, 100%);
         max-height: min(88vh, 900px);
-        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         background: linear-gradient(160deg, #221a38 0%, #171923 55%);
         border: 1px solid #6b4cff;
         border-radius: 14px;
         padding: 18px 20px 16px;
         box-shadow: 0 20px 56px rgba(0, 0, 0, 0.55);
         opacity: 0;
-        transform: translateY(12px) scale(0.97);
+        transform: translateY(10px);
         transition: opacity 0.22s ease, transform 0.22s ease;
       }
       .upgrades-modal.upgrades-modal-visible {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: none;
       }
       .upgrades-modal-header {
         display: flex;
@@ -513,10 +2205,22 @@
         margin: 0;
         font-size: 1.2rem;
       }
+      #upgradesOverlayMeta {
+        flex-shrink: 0;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .upgrades-modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        margin-top: 8px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: 4px;
+      }
       @keyframes upgrade-card-pop {
-        0% { opacity: 0; transform: translateY(10px) scale(0.96); }
-        60% { opacity: 1; transform: translateY(-2px) scale(1.02); }
-        100% { opacity: 1; transform: translateY(0) scale(1); }
+        0% { opacity: 0; transform: translateY(8px); }
+        100% { opacity: 1; transform: none; }
       }
       .upgrade-card-animate.upgrade-card-pulse {
         animation: upgrade-card-pop 0.38s ease-out backwards;
@@ -534,7 +2238,51 @@
         border-radius: 8px;
         padding: 8px;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        will-change: transform;
+      }
+      .upgrades-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 8px;
+      }
+      .upgrades-synergies-block {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid #3a3f52;
+      }
+      .upgrades-synergies-title {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #c9b8ff;
+      }
+      .upgrades-synergies-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .upgrades-synergy-item {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(143, 214, 148, 0.28);
+        background: linear-gradient(145deg, rgba(30, 53, 38, 0.55) 0%, rgba(27, 29, 37, 0.92) 100%);
+      }
+      .upgrades-synergy-name {
+        display: block;
+        font-size: 14px;
+        font-weight: 700;
+        color: #8fd694;
+        margin-bottom: 4px;
+      }
+      .upgrades-synergy-desc {
+        display: block;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #a9acb7;
       }
       @keyframes upgrade-card-purchase {
         0% { transform: scale(1) rotate(0deg); box-shadow: 0 0 0 0 rgba(143, 214, 148, 0); }
@@ -701,26 +2449,28 @@
       }
 
       .game-menu-fab {
-        position: fixed;
-        right: 14px;
-        top: 14px;
-        z-index: 10900;
+        position: relative;
+        top: auto;
+        right: auto;
+        flex-shrink: 0;
+        z-index: 2;
         width: auto;
         height: auto;
-        padding: 6px;
+        padding: 2px 4px;
         margin: 0;
         border: none;
-        border-radius: 0;
+        border-radius: 8px;
         background: transparent;
         box-shadow: none;
         color: #9a9eb0;
-        font-size: 40px;
+        font-size: 32px;
         line-height: 1;
         cursor: pointer;
-        transition: color 0.15s ease, transform 0.15s ease;
+        transition: color 0.15s ease, transform 0.15s ease, background 0.15s ease;
       }
       .game-menu-fab:hover {
         color: #e7e7ea;
+        background: rgba(122, 76, 255, 0.12);
         transform: rotate(24deg);
       }
       .game-menu-fab:active {
@@ -728,7 +2478,8 @@
       }
       #gameMenuOverlay,
       #feedbackOverlay,
-      #gameConfirmOverlay {
+      #gameConfirmOverlay,
+      #achievementsOverlay {
         position: fixed;
         inset: 0;
         z-index: 13000;
@@ -739,7 +2490,8 @@
       }
       #gameMenuOverlay[hidden],
       #feedbackOverlay[hidden],
-      #gameConfirmOverlay[hidden] {
+      #gameConfirmOverlay[hidden],
+      #achievementsOverlay[hidden] {
         display: none !important;
       }
       .game-menu-backdrop,
@@ -871,12 +2623,13 @@
       }
 
       .next-day-fab {
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
-        z-index: 9000;
+        position: static;
+        width: 100%;
+        flex-shrink: 0;
+        z-index: 1;
       }
       .next-day-btn {
+        width: 100%;
         position: relative;
         display: block;
         margin: 0;
@@ -893,7 +2646,9 @@
         align-items: center;
         justify-content: center;
         gap: 2px;
-        min-width: 156px;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
         padding: 10px 20px 12px;
         border-radius: 10px 10px 14px 14px;
         background: linear-gradient(165deg, #8b62ff 0%, #7a4cff 38%, #5a38c8 72%, #3d2a7a 100%);
@@ -1115,12 +2870,7 @@
         }
       }
       @media (max-width: 520px) {
-        .next-day-fab {
-          right: 12px;
-          bottom: 12px;
-        }
         .next-day-btn-inner {
-          min-width: 132px;
           padding: 8px 14px 10px;
         }
         .next-day-btn-label {
@@ -1131,74 +2881,111 @@
   </head>
   <body data-ui-mode="player">
     <div class="app-shell">
+      <div class="app-layout">
+      <div class="app-layout-main">
       <header class="card app-header">
-        <h1>Симулятор продавца маркетплейса</h1>
-        <p class="muted app-tagline">Закупки · реклама · KPI · рост магазина</p>
-        <div class="row player-toolbar">
-          <button id="upgradesBtn" type="button" class="btn-secondary btn-upgrades">
-            <span class="btn-upgrades-icon" aria-hidden="true">↑</span>
-            Улучшения
-          </button>
-          <span id="cryptoBtnWrap" class="crypto-btn-wrap game-tip crypto-locked" data-tip="Сначала изучите улучшение «Криптобиржа» в окне «Улучшения».">
-            <button id="cryptoBtn" type="button" class="btn-secondary btn-crypto" disabled aria-label="Криптобиржа">
-              <span class="btn-crypto-icon" aria-hidden="true">₿</span>
-              Криптобиржа
-            </button>
-          </span>
-          <button id="skipTutorialBtn" type="button" class="btn-secondary">Пропустить обучение</button>
+        <div class="app-header-layout">
+          <div class="app-header-main">
+            <h1>Симулятор продавца маркетплейса</h1>
+            <p class="muted app-tagline" id="appTagline">Закупки · реклама · KPI · рост магазина</p>
+            <div class="row player-toolbar">
+              <button id="upgradesBtn" type="button" class="btn-secondary btn-upgrades">
+                <span class="btn-upgrades-icon" aria-hidden="true">↑</span>
+                Улучшения
+              </button>
+              <span id="cryptoBtnWrap" class="crypto-btn-wrap game-tip crypto-locked" data-tip="Сначала изучите улучшение «Криптобиржа» в окне «Улучшения».">
+                <button id="cryptoBtn" type="button" class="btn-secondary btn-crypto" disabled aria-label="Криптобиржа">
+                  <span class="btn-crypto-icon" aria-hidden="true">₿</span>
+                  Криптобиржа
+                </button>
+              </span>
+              <span id="luxuryBtnWrap" class="luxury-btn-wrap game-tip luxury-locked" data-tip="Откроется после 3-го дня симуляции — когда бизнес уже приносит первые результаты.">
+                <button id="luxuryBtn" type="button" class="btn-secondary btn-luxury" disabled aria-label="Имущество">
+                  <span class="btn-luxury-icon" aria-hidden="true">◆</span>
+                  Имущество
+                </button>
+              </span>
+              <button id="skipTutorialBtn" type="button" class="btn-secondary">Пропустить обучение</button>
+            </div>
+            <div class="row dev-toolbar" data-dev-only>
+              <button id="saveBtn" type="button" class="btn-secondary">Сохранить</button>
+              <button id="loadBtn" type="button" class="btn-secondary">Загрузить</button>
+              <button id="exportJsonBtn" type="button" class="btn-secondary">Экспорт JSON</button>
+              <button id="exportPlaytestBtn" type="button" class="btn-secondary">Экспорт плейтеста</button>
+              <button id="exportServiceDiagBtn" type="button" class="btn-secondary">Экспорт диагностики</button>
+              <button id="exportPhase2Btn" type="button" class="btn-secondary">Экспорт phase2</button>
+              <button id="importJsonBtn" type="button" class="btn-secondary">Импорт JSON</button>
+              <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none" />
+            </div>
+            <p id="devModeHint" class="dev-hint" data-dev-only hidden>Режим разработчика (<code>?dev=1</code>). Для скринов и игроков используйте URL без параметра.</p>
+          </div>
+          <div class="app-header-aside">
+            <div id="questSidebarPanel" class="store-sidebar-quest header-quest-panel" hidden></div>
+            <button id="gameMenuBtn" type="button" class="game-menu-fab" aria-label="Меню" title="Меню">⚙</button>
+          </div>
         </div>
-        <div class="row dev-toolbar" data-dev-only>
-          <button id="saveBtn" type="button" class="btn-secondary">Сохранить</button>
-          <button id="loadBtn" type="button" class="btn-secondary">Загрузить</button>
-          <button id="exportJsonBtn" type="button" class="btn-secondary">Экспорт JSON</button>
-          <button id="exportPlaytestBtn" type="button" class="btn-secondary">Экспорт плейтеста</button>
-          <button id="exportServiceDiagBtn" type="button" class="btn-secondary">Экспорт диагностики</button>
-          <button id="exportPhase2Btn" type="button" class="btn-secondary">Экспорт phase2</button>
-          <button id="importJsonBtn" type="button" class="btn-secondary">Импорт JSON</button>
-          <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none" />
-        </div>
-        <p id="devModeHint" class="dev-hint" data-dev-only hidden>Режим разработчика (<code>?dev=1</code>). Для скринов и игроков используйте URL без параметра.</p>
       </header>
+
+      <main class="app-main">
 
       <!-- === ИГРОК: онбординг → закупка → сводка === -->
       <div class="card" data-ui-section="tutorial" data-beginner-min="1">
         <strong class="card-title">Обучение</strong>
         <div id="onboardingPanel" class="muted">Подсказки появятся после инициализации.</div>
         <div class="row" style="margin-top:8px;">
-          <button id="showAllSectionsBtn" type="button" class="btn-secondary">Показать все разделы</button>
+          <button id="showAllSectionsBtn" type="button" class="btn-secondary" data-dev-only>Показать все разделы</button>
           <button id="hideOnboardingBtn" type="button" class="btn-secondary" data-beginner-min="2">Скрыть подсказки</button>
         </div>
       </div>
 
-      <div class="card" data-ui-section="buy" data-beginner-min="1">
+      <div class="card buy-panel" data-ui-section="buy" data-beginner-min="1">
         <strong class="card-title">Закупка на склад</strong>
-        <p class="muted" style="margin:0 0 8px">Сначала завезите товар — без него продаж не будет.</p>
-        <div class="row" style="margin-top: 4px;">
-          <button type="button" id="quickStartBtn" class="btn-primary">Стартовая закупка</button>
+        <p class="muted buy-panel-lead">Завезите товар — деньги спишутся сразу, на склад партия приедет через несколько дней.</p>
+        <div class="buy-panel-layout">
+          <div id="buySkuPreview" class="buy-sku-preview muted" aria-hidden="true">Товар</div>
+          <div id="buyManualRow" class="buy-panel-form">
+            <label class="field">Товар
+              <select id="skuSelect"></select>
+            </label>
+            <label class="field">Количество
+              <input type="number" id="qtyInput" min="1" value="80" step="1" />
+            </label>
+            <button type="button" id="buyBtn" class="btn-primary">Закупить</button>
+          </div>
         </div>
-        <div id="buyManualRow" class="row" style="align-items: flex-end; margin-top: 10px;">
-          <label class="field">Товар
-            <select id="skuSelect"></select>
-          </label>
-          <label class="field">Количество
-            <input type="number" id="qtyInput" min="1" value="80" step="1" />
-          </label>
-          <button type="button" id="buyBtn">Купить</button>
-        </div>
-        <p class="muted" id="buyHint" style="margin: 8px 0 0;"></p>
+        <p class="buy-panel-hint muted" id="buyHint">Выберите товар — покажем стоимость и день прибытия.</p>
       </div>
 
-      <div class="card" data-ui-section="summary" data-beginner-min="1">
-        <strong class="card-title">Сводка</strong>
-        <div id="summary"></div>
-        <div id="serviceRating" class="muted" data-beginner-min="3" style="margin-top:8px;">Рейтинг сервиса появится после первой симуляции.</div>
-        <div id="serviceDiagnostics" class="muted" data-beginner-min="4" style="margin-top:6px;">Диагностика появится позже.</div>
-        <div class="row" data-beginner-min="4" style="margin-top:8px;">
+      <div id="beginnerTeaser" class="card" data-ui-section="teaser" hidden></div>
+
+      <div class="card" data-ui-section="kpi" data-beginner-min="3">
+        <strong class="card-title">Показатели (KPI)</strong>
+        <div id="kpiChartsRow" class="kpi-charts-row muted">Графики появятся после первого дня.</div>
+        <div id="kpiDashboard" class="kpi-grid">
+          <div class="muted">Нет данных — нажмите «Следующий день».</div>
+        </div>
+        <div id="kpiAlertsPanel" class="muted" data-beginner-min="4" style="margin-top:10px;">Подсказки появятся после первой симуляции.</div>
+        <div id="categoryKpiTable" class="muted" data-dev-only style="margin-top:8px;">По категориям — позже.</div>
+        <div id="categoryRecommendations" class="muted" data-dev-only style="margin-top:8px;">Рекомендации — позже.</div>
+        <div class="row" data-dev-only style="margin-top:10px; align-items:flex-end; flex-wrap:wrap; gap:8px;">
           <label class="field">Категория
             <select id="categoryFilterSelect"></select>
           </label>
+          <label class="field">Фильтр остатков
+            <select id="skuStockFilterSelect">
+              <option value="all">Все товары</option>
+              <option value="in_stock">В наличии</option>
+              <option value="low_stock">Низкий запас</option>
+              <option value="out_of_stock">Нет на складе</option>
+            </select>
+          </label>
+          <label class="field" style="flex:1; min-width:180px;">Поиск
+            <input type="search" id="skuSearchInput" placeholder="имя товара" />
+          </label>
         </div>
-        <div data-dev-only>
+        <div data-dev-only style="margin-top:10px"><b>Быстрые пресеты</b></div>
+        <div id="qolPresetsPanel" class="muted" data-dev-only style="margin-top:4px;">Пресеты позже.</div>
+        <div data-dev-only style="margin-top:10px;">
           <div class="row" style="margin-top:8px;">
             <button id="importServiceDiagBaseBtn" type="button" class="btn-secondary">Импорт baseline</button>
             <button id="importServiceDiagCandBtn" type="button" class="btn-secondary">Импорт candidate</button>
@@ -1210,63 +2997,6 @@
         </div>
       </div>
 
-      <div id="beginnerTeaser" class="card" data-ui-section="teaser" hidden></div>
-
-      <div class="card" data-ui-section="supplies" data-beginner-min="2">
-        <div><b>В пути</b></div>
-        <div id="incomingList" class="muted">Нет активных поставок</div>
-        <div style="margin-top:10px"><b>Приход на склад</b></div>
-        <div id="morningArrivals" class="muted">После «Следующий день» здесь появятся приходы.</div>
-      </div>
-
-      <div class="card" data-ui-section="ad" data-beginner-min="2">
-        <strong class="card-title">Реклама</strong>
-        <p class="muted" style="margin:0 0 8px">Больше бюджет — больше заказов, но выше расходы.</p>
-        <div class="row" style="align-items: center; margin-top: 4px;">
-          <label class="field" style="min-width: 160px;">Статус
-            <label style="display:flex;align-items:center;gap:8px;color:#e7e7ea">
-              <input type="checkbox" id="adEnabledToggle" checked />
-              <span>Включена</span>
-            </label>
-          </label>
-          <label class="field" style="flex: 1; min-width: 200px;">Бюджет на день
-            <input type="range" id="adBudgetRange" min="0" max="15000" step="100" value="0" />
-          </label>
-          <span id="adBudgetLabel" class="muted">0</span>
-        </div>
-      </div>
-
-      <div class="card" data-ui-section="yesterday" data-beginner-min="3">
-        <strong class="card-title">Итог вчерашнего дня</strong>
-        <div id="yesterdayReport" class="muted">Ещё не было симуляции.</div>
-      </div>
-
-      <div class="card" data-ui-section="kpi" data-beginner-min="3">
-        <strong class="card-title">Показатели (KPI)</strong>
-        <div id="kpiChartsRow" class="kpi-charts-row muted">Графики появятся после первого дня.</div>
-        <div id="kpiDashboard" class="kpi-grid">
-          <div class="muted">Нет данных — нажмите «Следующий день».</div>
-        </div>
-        <div id="kpiAlertsPanel" class="muted" data-beginner-min="4" style="margin-top:10px;">Подсказки появятся после первой симуляции.</div>
-        <div id="categoryKpiTable" class="muted" data-beginner-min="4" style="margin-top:8px;">По категориям — позже.</div>
-        <div id="categoryRecommendations" class="muted" data-beginner-min="4" style="margin-top:8px;">Рекомендации — позже.</div>
-        <div class="row" data-beginner-min="4" style="margin-top:10px; align-items:flex-end;">
-          <label class="field">Фильтр остатков
-            <select id="skuStockFilterSelect">
-              <option value="all">Все SKU</option>
-              <option value="in_stock">В наличии</option>
-              <option value="low_stock">Низкий запас</option>
-              <option value="out_of_stock">Нет на складе</option>
-            </select>
-          </label>
-          <label class="field" style="flex:1; min-width:180px;">Поиск
-            <input type="search" id="skuSearchInput" placeholder="имя товара" />
-          </label>
-        </div>
-        <div data-beginner-min="4" style="margin-top:10px"><b>Быстрые пресеты</b></div>
-        <div id="qolPresetsPanel" class="muted" data-beginner-min="4" style="margin-top:4px;">Пресеты позже.</div>
-      </div>
-
       <div class="card" data-ui-section="cost" data-beginner-min="3">
         <strong class="card-title">Затраты за день</strong>
         <div id="costBreakdown" class="muted">Нет данных — нажмите «Следующий день».</div>
@@ -1274,13 +3004,30 @@
 
       <div class="card" data-ui-section="merch" data-beginner-min="3">
         <strong class="card-title">Цены и качество карточек</strong>
-        <p class="muted" style="margin: 0 0 8px">Стартовая цена и качество — на минимуме. Цену поднимите вручную или «Реком.»; качество — кнопкой «Улучшить».</p>
+        <p class="muted" style="margin: 0 0 10px">Стартовая цена и качество — на минимуме. В колонке «Остаток» — запас на складе. Цену поднимите вручную или «Реком.»; качество — кнопкой «Улучшить».</p>
+        <div class="merch-ad-bar">
+          <div class="merch-ad-bar-head">
+            <strong>Реклама</strong>
+            <span class="muted">больше бюджет — больше заказов</span>
+          </div>
+          <div class="ad-controls">
+            <div class="ad-toggle-wrap">
+              <label class="game-toggle">
+                <span class="game-toggle-label">Включена</span>
+                <input type="checkbox" id="adEnabledToggle" />
+                <span class="game-toggle-track" aria-hidden="true"><span class="game-toggle-thumb"></span></span>
+              </label>
+            </div>
+            <div class="field ad-budget-field" id="adBudgetField">
+              <span class="field-label">Бюджет на день</span>
+              <div class="game-range-wrap">
+                <input type="range" id="adBudgetRange" class="game-range" min="0" max="15000" step="100" value="0" />
+              </div>
+            </div>
+            <span id="adBudgetLabel" class="ad-budget-value">0</span>
+          </div>
+        </div>
         <div id="merchRoot"></div>
-      </div>
-
-      <div class="card" data-ui-section="stock" data-beginner-min="3">
-        <strong class="card-title">Склад</strong>
-        <div id="stockTable"></div>
       </div>
 
       <div class="card" data-ui-section="styles" data-beginner-min="4">
@@ -1293,11 +3040,6 @@
         <strong class="card-title">Прогрессия</strong>
         <div id="progressionMeta" class="muted">Узлы прокачки магазина.</div>
         <div id="progressionPanel" class="muted" style="margin-top:8px;">Нет данных прогрессии.</div>
-      </div>
-
-      <div class="card" data-ui-section="events" data-beginner-min="4">
-        <strong class="card-title">События рынка</strong>
-        <div id="eventsPanel" class="muted">События появятся после инициализации.</div>
       </div>
 
       <div class="card" data-ui-section="team" data-beginner-min="4">
@@ -1365,7 +3107,7 @@
         <strong>Возвраты (dev)</strong>
         <div class="row" style="align-items: center; margin-top: 8px;">
           <label class="field" style="flex: 1; min-width: 220px;">Модификатор возвратов
-            <input id="returnRateModRange" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+            <input id="returnRateModRange" class="game-range" type="range" min="0.5" max="1.5" step="0.05" value="1" />
           </label>
           <span id="returnRateModLabel" class="muted">x1.00</span>
         </div>
@@ -1475,11 +3217,52 @@
         <strong>State Debug</strong>
         <pre id="stateDump"></pre>
       </div>
+      </main>
+      </div>
+
+      <div class="store-sidebar-column">
+      <aside class="card store-sidebar">
+        <div id="shopNameDisplay" class="store-name-display" aria-label="Название магазина">Мой магазин</div>
+        <input id="shopNameInput" class="store-name-input--edit" type="text" maxlength="32" placeholder="Мой магазин" autocomplete="organization" hidden />
+        <div class="store-summary-panel" data-ui-section="summary" data-beginner-min="1">
+          <h3 class="store-sidebar-title">Сводка</h3>
+          <div id="summary" class="store-summary"></div>
+        </div>
+        <div id="serviceRating" class="store-service-card store-service-card--pending" data-beginner-min="3">
+          <div class="store-service-card-kicker">Рейтинг сервиса</div>
+          <p class="store-service-card-placeholder muted">Появится после первого дня продаж</p>
+        </div>
+        <div id="incomingSidebarPanel" class="store-incoming-panel" data-ui-section="incoming">
+          <h3>В пути</h3>
+          <div id="incomingSidebarList" class="store-incoming-empty">Нет заказов в пути</div>
+        </div>
+        <div class="store-events-panel" data-ui-section="events" data-beginner-min="4">
+          <h3 class="store-sidebar-title">События рынка</h3>
+          <div id="eventsPanel" class="store-events muted">События появятся после инициализации.</div>
+        </div>
+        <div id="serviceDiagnosticsWrap" class="store-service-hints" data-dev-only>
+          <button type="button" id="serviceDiagnosticsToggle" class="store-service-hints-toggle" disabled>
+            Подсказка по рейтингу
+          </button>
+          <div id="serviceDiagnostics" class="store-service-hints-panel" hidden></div>
+        </div>
+      </aside>
+      <div id="nextDayFab" class="next-day-fab">
+        <button id="nextDayBtn" type="button" class="next-day-btn" aria-label="Следующий день">
+          <span class="next-day-btn-inner">
+            <span class="next-day-btn-arrow" aria-hidden="true">➜</span>
+            <span class="next-day-btn-label">Следующий день</span>
+            <span class="next-day-btn-day" id="nextDayFabDay">День 1</span>
+          </span>
+        </button>
+      </div>
+      </div>
+      </div>
     </div>
 
-    <div id="gameTooltipRoot" class="game-tooltip" hidden role="tooltip"></div>
+    <div id="achievementPopupRoot" class="achievement-popup-root" hidden></div>
 
-    <button id="gameMenuBtn" type="button" class="game-menu-fab" aria-label="Меню" title="Меню">⚙</button>
+    <div id="gameTooltipRoot" class="game-tooltip" hidden role="tooltip"></div>
 
     <div id="gameMenuOverlay" hidden>
       <div class="game-menu-backdrop" aria-hidden="true"></div>
@@ -1489,10 +3272,27 @@
           <h2 id="gameMenuTitle">Меню</h2>
         </div>
         <div class="game-menu-actions">
+          <button id="gameMenuAchievementsBtn" type="button" class="btn-secondary">Достижения</button>
           <button id="gameMenuTutorialBtn" type="button" class="btn-secondary">Обучение заново</button>
           <button id="gameMenuFeedbackBtn" type="button" class="btn-secondary">Обратная связь</button>
           <button id="gameMenuResetBtn" type="button" class="btn-secondary btn-menu-danger">Начать игру заново</button>
         </div>
+      </div>
+    </div>
+
+    <div id="shopNameWelcomeOverlay" hidden>
+      <div class="shop-welcome-backdrop" aria-hidden="true"></div>
+      <div class="shop-welcome-modal" role="dialog" aria-modal="true" aria-labelledby="shopNameWelcomeTitle">
+        <h2 id="shopNameWelcomeTitle">Добро пожаловать!</h2>
+        <p class="shop-welcome-lead">Вы открываете свой магазин на маркетплейсе. Как его назовём? Это имя будет в событиях и отчётах.</p>
+        <form id="shopNameWelcomeForm">
+          <label class="shop-welcome-field field">Название магазина
+            <input id="shopNameWelcomeInput" type="text" maxlength="32" autocomplete="organization" />
+            <span class="shop-welcome-hint">Можно оставить пустым — будет «Мой магазин». Или выберите шуточный вариант:</span>
+          </label>
+          <div id="shopNameSuggestions" class="shop-name-suggestions" aria-label="Идеи для названия"></div>
+          <button id="shopNameWelcomeSubmitBtn" type="submit" class="btn-primary" style="width:100%">Начать обучение</button>
+        </form>
       </div>
     </div>
 
@@ -1524,14 +3324,35 @@
 
     <div id="gameToastRoot" class="game-toast-root" aria-live="polite"></div>
 
-    <div id="nextDayFab" class="next-day-fab">
-      <button id="nextDayBtn" type="button" class="next-day-btn" aria-label="Следующий день">
-        <span class="next-day-btn-inner">
-          <span class="next-day-btn-arrow" aria-hidden="true">➜</span>
-          <span class="next-day-btn-label">Следующий день</span>
-          <span class="next-day-btn-day" id="nextDayFabDay">День 1</span>
-        </span>
-      </button>
+    <div id="luxuryOverlay" hidden>
+      <div class="luxury-backdrop" aria-hidden="true"></div>
+      <div class="luxury-modal" role="dialog" aria-modal="true" aria-labelledby="luxuryOverlayTitle">
+        <button id="luxuryOverlayClose" type="button" class="modal-close-btn" aria-label="Закрыть">×</button>
+        <div class="luxury-modal-header">
+          <div>
+            <h2 id="luxuryOverlayTitle">Имущество</h2>
+            <p class="muted" style="margin:0;font-size:12px">Личные покупки вне бизнеса: авто, недвижимость, яхты, искусство. Деньги списываются сразу — это ваш статус и коллекция.</p>
+          </div>
+        </div>
+        <div id="luxuryOverlayMeta" class="muted">Загрузка…</div>
+        <div id="luxuryOverlayTabs" class="luxury-tabs"></div>
+        <div id="luxuryOverlayGrid" class="luxury-grid muted">Загрузка каталога…</div>
+      </div>
+    </div>
+
+    <div id="luxuryDetailOverlay" hidden>
+      <div class="luxury-detail-backdrop" aria-hidden="true"></div>
+      <div class="luxury-detail-panel" role="dialog" aria-modal="true" aria-labelledby="luxuryDetailTitle">
+        <button id="luxuryDetailClose" type="button" class="modal-close-btn" aria-label="Закрыть">×</button>
+        <div id="luxuryDetailArt" class="luxury-detail-art"></div>
+        <div class="luxury-detail-body">
+          <h2 id="luxuryDetailTitle"></h2>
+          <p id="luxuryDetailDesc" class="luxury-detail-desc muted"></p>
+          <ul id="luxuryDetailSpecs" class="luxury-detail-specs"></ul>
+          <div id="luxuryDetailMeta" class="luxury-detail-meta"></div>
+          <div id="luxuryDetailActions" class="luxury-detail-actions"></div>
+        </div>
+      </div>
     </div>
 
     <div id="cryptoOverlay" hidden>
@@ -1550,6 +3371,20 @@
       </div>
     </div>
 
+    <div id="achievementsOverlay" hidden>
+      <div class="achievements-backdrop feedback-backdrop" aria-hidden="true"></div>
+      <div class="feedback-modal achievements-modal" role="dialog" aria-modal="true" aria-labelledby="achievementsOverlayTitle">
+        <button id="achievementsCloseBtn" type="button" class="modal-close-btn" aria-label="Закрыть">×</button>
+        <div class="feedback-modal-header">
+          <div>
+            <h2 id="achievementsOverlayTitle">Достижения</h2>
+            <p id="achievementsMeta" class="muted" style="margin:4px 0 0;font-size:13px">Открыто 0 из 0</p>
+          </div>
+        </div>
+        <div id="achievementsList" class="muted achievements-list">Загрузка…</div>
+      </div>
+    </div>
+
     <div id="upgradesOverlay" hidden>
       <div class="upgrades-backdrop" aria-hidden="true"></div>
       <div class="upgrades-modal" role="dialog" aria-modal="true" aria-labelledby="upgradesOverlayTitle">
@@ -1561,7 +3396,9 @@
           <button id="upgradesOverlayClose" type="button" class="btn-secondary">Закрыть</button>
         </div>
         <div id="upgradesOverlayMeta" class="muted">Загрузка…</div>
-        <div id="upgradesOverlayPanel" class="muted" style="margin-top:8px;">Нет данных.</div>
+        <div class="upgrades-modal-body">
+          <div id="upgradesOverlayPanel" class="muted">Нет данных.</div>
+        </div>
       </div>
     </div>
 
@@ -1578,10 +3415,26 @@
             ? "https://sdk.games.s3.yandex.net/sdk.js"
             : "";
 
+        function showBootError(msg) {
+          console.error("MSSIM boot:", msg);
+          var box = document.getElementById("bootError");
+          if (!box) {
+            box = document.createElement("div");
+            box.id = "bootError";
+            box.style.cssText =
+              "position:fixed;inset:16px auto auto 16px;right:16px;z-index:20000;padding:12px 14px;border-radius:10px;background:#3a1820;border:1px solid #ff8f8f;color:#ffd0d0;font:13px/1.45 Arial,sans-serif;";
+            document.body.appendChild(box);
+          }
+          box.textContent = "Ошибка загрузки игры: " + msg + " Обновите страницу (Ctrl+F5).";
+        }
+
         function startApp() {
           var el = document.createElement("script");
           el.type = "module";
-          el.src = "./src/app.js";
+          el.src = "./src/app.js?v=100-20260624";
+          el.onerror = function () {
+            showBootError("не удалось загрузить src/app.js");
+          };
           document.body.appendChild(el);
         }
 

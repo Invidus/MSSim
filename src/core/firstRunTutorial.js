@@ -1,4 +1,5 @@
 import { totalStockForOnboarding } from "./onboardingModel.js";
+import { needsShopNamePrompt } from "./storeIdentityModel.js";
 
 /** @typedef {import('./firstRunTutorial.js').TutorialStepDef} TutorialStepDef */
 
@@ -42,6 +43,7 @@ export function getTutorialStepCount() {
  */
 export function isTutorialActive(state) {
   if (!state) return false;
+  if (needsShopNamePrompt(state)) return false;
   if (state.tutorialCompleted || state.tutorialSkipped) return false;
   if (state.onboardingHidden) return false;
   return true;
@@ -70,10 +72,8 @@ export function syncTutorialBeat(state) {
   const max = tutorialSteps.length;
 
   if (!hasGoods(state) && beat > 3) beat = 3;
-  if (!state.lastDayReport && beat > 5) beat = 5;
 
   if (beat === 3 && hasGoods(state)) beat = 4;
-  if (beat === 5 && state.lastDayReport) beat = 6;
 
   state.tutorialBeat = Math.min(beat, max);
 }
@@ -120,6 +120,8 @@ export function getTutorialContent(step, state) {
     const profit = Math.round(Number(state.kpi?.profit) || 0).toLocaleString("ru-RU");
     const revenue = Math.round(Number(state.kpi?.revenue) || 0).toLocaleString("ru-RU");
     body = `${def.body} Ваш первый день: выручка ${revenue} ₽, прибыль ${profit} ₽.`;
+  } else if (def.id === "results") {
+    body = `${def.body} После первого «Следующий день» здесь появятся ваши цифры.`;
   }
 
   const interactive = def.advance === "has_goods" || def.advance === "simulated";
@@ -137,6 +139,8 @@ export function getTutorialContent(step, state) {
     waitHint: def.waitHint || null,
     spotlight: def.spotlight || null,
     placement: def.placement || "bottom",
+    popoverAnchor: def.popoverAnchor || null,
+    popoverMaxWidth: Number(def.popoverMaxWidth) || 0,
     highlights: Array.isArray(def.highlights) ? def.highlights : [],
     highlightNextDay: def.highlightNextDay === true,
     showBuyManual: def.showBuyManual === true,
@@ -180,11 +184,15 @@ export function advanceTutorialBeat(state) {
 }
 
 /**
+ * Завершает spotlight-обучение, если стартовый квест уже пройден (в т.ч. после загрузки сейва).
  * @param {object} state
  */
 export function syncTutorialCompletion(state) {
-  void state;
-  return false;
+  if (!state?.simpleQuestCompleted) return false;
+  if (state.tutorialCompleted || state.tutorialSkipped) return false;
+  state.tutorialCompleted = true;
+  state.beginnerUiExpanded = true;
+  return true;
 }
 
 /**

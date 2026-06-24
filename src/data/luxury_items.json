@@ -1,0 +1,42 @@
+[
+  { "id": "bike_city", "category": "auto", "name": "Городской велосипед", "desc": "Свобода без пробок и парковок.", "price": 45000, "tier": 1, "visual": "auto", "accent": "#6bcf7f", "image": "assets/luxury/bike_city.png", "maxSpeedKmh": 25 },
+  { "id": "car_lada", "category": "auto", "name": "Nelepo Granta", "desc": "Первый автомобиль — символ выхода из режима выживания.", "price": 650000, "tier": 2, "visual": "auto", "accent": "#c45c2a", "image": "assets/luxury/car_lada.png", "maxSpeedKmh": 165 },
+  { "id": "car_camry", "category": "auto", "name": "Totoda Camri", "desc": "Надёжная классика для деловых поездок.", "price": 2800000, "tier": 3, "visual": "auto", "accent": "#8a9bb5", "image": "assets/luxury/car_camry.png", "maxSpeedKmh": 210 },
+  { "id": "car_bmw5", "category": "auto", "name": "Daimer 5 Series", "desc": "Комфорт и статус в одном седане.", "price": 6500000, "tier": 4, "visual": "auto", "accent": "#4a90d9", "image": "assets/luxury/car_bmw5.png", "maxSpeedKmh": 250 },
+  { "id": "car_porsche", "category": "auto", "name": "Daitona 922", "desc": "Спорткар для тех, кто любит скорость.", "price": 18000000, "tier": 5, "visual": "auto", "accent": "#e8c547", "image": "assets/luxury/car_porsche.png", "maxSpeedKmh": 312 },
+  { "id": "car_lambo", "category": "auto", "name": "Lamburger Guracan", "desc": "Суперкар, который видно за километр.", "price": 42000000, "tier": 6, "visual": "auto", "accent": "#ff6b35", "image": "assets/luxury/car_lambo.png", "maxSpeedKmh": 325 },
+
+  { "id": "home_room", "category": "realty", "name": "Комната в общежитии", "desc": "Свой угол — пусть и скромный.", "price": 800000, "tier": 1, "visual": "realty", "accent": "#9a8b7a", "image": "assets/luxury/home_room.png" },
+  { "id": "home_studio", "category": "realty", "name": "Студия в спальном районе", "desc": "Первое жильё с отдельной кухней.", "price": 3500000, "tier": 2, "visual": "realty", "accent": "#7a9e8e", "image": "assets/luxury/home_studio.png" },
+  { "id": "home_flat", "category": "realty", "name": "Двушка у метро", "desc": "Простор для семьи и гостей.", "price": 9000000, "tier": 3, "visual": "realty", "accent": "#6b8cce", "image": "assets/luxury/home_flat.png" },
+  { "id": "home_cottage", "category": "realty", "name": "Коттедж в Подмосковье", "desc": "Участок, терраса и тишина за городом.", "price": 28000000, "tier": 4, "visual": "realty", "accent": "#5a9a6a", "image": "assets/luxury/home_cottage.png" },
+  { "id": "home_penthouse", "category": "realty", "name": "Пентхаус с панорамой", "desc": "Вид на город с верхнего этажа.", "price": 95000000, "tier": 5, "visual": "realty", "accent": "#c9b8ff", "image": "assets/luxury/home_penthouse.png" },
+  { "id": "home_villa", "category": "realty", "name": "Вилла на побережье", "desc": "Море, бассейн и личный выход к пляжу.", "price": 220000000, "tier": 6, "visual": "realty", "accent": "#5ec8e8", "image": "assets/luxury/home_villa.png" },
+
+  { "id": "plane_training", "category": "aviation", "name": "Учебный самолёт", "desc": "Лётная школа и первые часы в небе.", "price": 12000000, "tier": 1, "visual": "aviation", "accent": "#a8c4e8", "image": "assets/luxury/plane_training.png", "maxSpeedKmh": 220 },
+  { "id": "plane_cessna", "category": "aviation", "name": "Kessno Sitasion", "desc": "Лёгкий джет для региональных перелётов.", "price": 45000000, "tier": 2, "visual": "aviation", "accent": "#d4dce8", "image": "assets/luxury/plane_cessna.png", "maxSpeedKmh": 750 },
+  { "id": "plane_g650", "category": "aviation", "name": "Galfstrim G750", "desc": "Межконтинентальный бизнес-джет.", "price": 180000000, "tier": 3, "visual": "aviation", "accent": "#e8d4a8", "image": "assets/luxury/plane_g650.png", "maxSpeedKmh": 956 },
+  { "id": "plane_bbj", "category": "aviation", "name": "Boyng BBJ", "desc": "Летающий особняк на 19 пассажиров.", "price": 520000000, "tier": 4, "visual": "aviation", "accent": "#ffffff", "image": "assets/luxury/plane_bbj.png", "maxSpeedKmh": 940 },
+
+  { "id": "yacht_boat", "category": "yacht", "name": "Катер на 6 человек", "desc": "Рыбалка и прогулки по заливу.", "price": 8500000, "tier": 1, "visual": "yacht", "accent": "#4a8fc4", "image": "assets/luxury/yacht_boat.png", "maxSpeedKnots": 28 },
+  { "id": "yacht_25m", "category": "yacht", "name": "Яхта 25 м", "desc": "Каюты, камбуз и палуба для вечеринок.", "price": 35000000, "tier": 2, "visual": "yacht", "accent": "#3a7ab0", "image": "assets/luxury/yacht_25m.png", "maxSpeedKnots": 32 },
+  { "id": "yacht_super", "category": "yacht", "name": "Суперяхта 80 м", "desc": "Вертолётная площадка и экипаж из 30 человек.", "price": 190000000, "tier": 3, "visual": "yacht", "accent": "#2a5a90", "image": "assets/luxury/yacht_super.png", "maxSpeedKnots": 22 },
+
+  { "id": "art_poster", "category": "art", "name": "Постер в рамке", "desc": "Декор для домашнего кабинета.", "price": 25000, "tier": 1, "visual": "art", "accent": "#e8a87c", "image": "assets/luxury/art_poster.png" },
+  { "id": "art_canvas", "category": "art", "name": "Масло на холсте", "desc": "Работа молодого художника.", "price": 180000, "tier": 2, "visual": "art", "accent": "#d47850", "image": "assets/luxury/art_canvas.png" },
+  { "id": "art_litho", "category": "art", "name": "Литография мастера", "desc": "Ограниченный тираж с подписью.", "price": 1200000, "tier": 3, "visual": "art", "accent": "#c45c8a", "image": "assets/luxury/art_litho.png" },
+  { "id": "art_modern", "category": "art", "name": "Картина современника", "desc": "Хит локальной галереи.", "price": 8000000, "tier": 4, "visual": "art", "accent": "#9a4cff", "image": "assets/luxury/art_modern.png" },
+  { "id": "art_auction", "category": "art", "name": "Полотно с аукциона", "desc": "Лот, о котором пишут в СМИ.", "price": 55000000, "tier": 5, "visual": "art", "accent": "#ffd700", "image": "assets/luxury/art_auction.png" },
+
+  { "id": "watch_smart", "category": "watches", "name": "Смарт-часы", "desc": "Уведомления и шаги на запястье.", "price": 35000, "tier": 1, "visual": "watches", "accent": "#4a5568", "image": "assets/luxury/watch_smart.png" },
+  { "id": "watch_swiss", "category": "watches", "name": "Швейцарские часы", "desc": "Классика с механизмом E-TA.", "price": 420000, "tier": 2, "visual": "watches", "accent": "#c9a84c", "image": "assets/luxury/watch_swiss.png" },
+  { "id": "watch_rolex", "category": "watches", "name": "Xollex Daitona", "desc": "Икона хронографов.", "price": 2800000, "tier": 3, "visual": "watches", "accent": "#d4af37", "image": "assets/luxury/watch_rolex.png" },
+  { "id": "watch_patek", "category": "watches", "name": "Potek Philip", "desc": "«Вы никогда по-настоящему не владеете…»", "price": 18000000, "tier": 4, "visual": "watches", "accent": "#b8860b", "image": "assets/luxury/watch_patek.png" },
+  { "id": "watch_diamond", "category": "watches", "name": "Бриллиантовые часы", "desc": "Корпус в белом золоте и бриллианты.", "price": 45000000, "tier": 5, "visual": "watches", "accent": "#e8f0ff", "image": "assets/luxury/watch_diamond.png" },
+
+  { "id": "island_rocky", "category": "islands", "name": "Скалистый остров", "desc": "Скромное уединение в Средиземном море.", "price": 680000000, "tier": 1, "visual": "islands", "accent": "#8a9e7a", "image": "assets/luxury/island_rocky.png", "area": "0,5 га (~70×70 м)" },
+  { "id": "island_tropical", "category": "islands", "name": "Тропический остров", "desc": "Пальмовая аллея, бунгало и лагуна с бирюзовой водой.", "price": 1100000000, "tier": 2, "visual": "islands", "accent": "#5ec8a8", "image": "assets/luxury/island_tropical.png", "area": "2 га (~140×140 м)" },
+  { "id": "island_archipelago", "category": "islands", "name": "Архипелаг (3 острова)", "desc": "Три острова, частная флотилия и доки между ними.", "price": 2400000000, "tier": 3, "visual": "islands", "accent": "#4ab0c4", "image": "assets/luxury/island_archipelago.png", "area": "12 га (3 острова)" },
+  { "id": "island_atoll", "category": "islands", "name": "Атолл с ВПП", "desc": "Коралловое кольцо, взлётная полоса и марина для яхт.", "price": 5500000000, "tier": 4, "visual": "islands", "accent": "#3a8fc8", "image": "assets/luxury/island_atoll.png", "area": "45 га (кольцо ~1,2 км)" },
+  { "id": "island_sovereign", "category": "islands", "name": "Суверенный остров", "desc": "Частная юрисдикция, резиденция и флаг на карте мира.", "price": 15000000000, "tier": 5, "visual": "islands", "accent": "#ffd700", "image": "assets/luxury/island_sovereign.png", "area": "120 га (~1,1×1,1 км)" }
+]

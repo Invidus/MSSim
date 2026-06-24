@@ -1,5 +1,8 @@
 /dist/
 node_modules/
+mssim-v*-yandex.zip
+mssim-v*-store-assets.zip
+.store-upload/
 
 # OS / editor
 .DS_Store
@@ -16,6 +19,7 @@ Thumbs.db
 
 # Personal project map (not for repo)
 remember
+AI_CONTEXT.md
 
 # Markdown (design docs — не в репозитории)
 *.md

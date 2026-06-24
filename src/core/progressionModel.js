@@ -111,6 +111,7 @@ function mergeEffectIntoMods(mods, effect) {
   if (effect.stockoutServiceMult) mods.stockoutServiceMult *= Number(effect.stockoutServiceMult) || 1;
   if (effect.globalProfitMult) mods.globalProfitMult *= Number(effect.globalProfitMult) || 1;
   if (effect.eventDamageMult) mods.eventDamageMult *= Number(effect.eventDamageMult) || 1;
+  if (effect.teamEffectMult) mods.teamEffectMult *= Number(effect.teamEffectMult) || 1;
   if (effect.forecastAccuracyBonus) mods.forecastAccuracyBonus += Number(effect.forecastAccuracyBonus) || 0;
   if (effect.autoReprice) mods.autoReprice = true;
   if (effect.autoReorder) mods.autoReorder = true;
@@ -143,5 +144,17 @@ export function applyQualityFloor(state, qualityFloor) {
     const id = sku.id;
     const current = snapQualityScore(Number(state.qualityScore?.[id]) || DEFAULT_QUALITY_SCORE);
     state.qualityScore[id] = Math.max(current, target);
+  }
+}
+
+/** Сбрасывает качество, ошибочно поднятое старым полом от score 52 без узлов прогрессии. */
+export function repairLegacyQualityFloorBug(state, nodes) {
+  const prog = getProgressionModifiers(state, nodes);
+  if (prog.qualityFloorDelta > 0) return;
+  const legacyTarget = scoreAtOrAboveFloor(52);
+  if (!state?.qualityScore || !state?.skus) return;
+  for (const sku of state.skus) {
+    const id = sku.id;
+    if (state.qualityScore[id] === legacyTarget) state.qualityScore[id] = DEFAULT_QUALITY_SCORE;
   }
 }

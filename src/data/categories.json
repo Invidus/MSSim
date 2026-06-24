@@ -1,7 +1,7 @@
 ﻿[
   {
     "id": "beauty",
-    "name": "Beauty and Care",
+    "name": "Красота и уход",
     "baseDemandMod": 1.15,
     "baseMarginMod": 0.32,
     "baseReturnRate": 0.07,
@@ -10,7 +10,7 @@
   },
   {
     "id": "home",
-    "name": "Home and Kitchen",
+    "name": "Дом и кухня",
     "baseDemandMod": 1.0,
     "baseMarginMod": 0.28,
     "baseReturnRate": 0.06,
@@ -19,7 +19,7 @@
   },
   {
     "id": "kids",
-    "name": "Kids and Toys",
+    "name": "Дети и игрушки",
     "baseDemandMod": 0.95,
     "baseMarginMod": 0.3,
     "baseReturnRate": 0.09,
@@ -28,7 +28,7 @@
   },
   {
     "id": "apparel",
-    "name": "Apparel and Basics",
+    "name": "Одежда и базовые вещи",
     "baseDemandMod": 1.2,
     "baseMarginMod": 0.35,
     "baseReturnRate": 0.16,
@@ -37,7 +37,7 @@
   },
   {
     "id": "pet",
-    "name": "Pet Supplies",
+    "name": "Товары для животных",
     "baseDemandMod": 0.9,
     "baseMarginMod": 0.26,
     "baseReturnRate": 0.05,
@@ -46,7 +46,7 @@
   },
   {
     "id": "electronics",
-    "name": "Gadgets and Accessories",
+    "name": "Гаджеты и аксессуары",
     "baseDemandMod": 1.05,
     "baseMarginMod": 0.33,
     "baseReturnRate": 0.1,

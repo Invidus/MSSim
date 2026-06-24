@@ -6,6 +6,24 @@
  */
 
 /**
+ * @param {object} sdk
+ */
+async function loadPlayer(sdk) {
+  if (!sdk || typeof sdk.getPlayer !== "function") return null;
+  try {
+    return await sdk.getPlayer({ signed: true });
+  } catch (signedError) {
+    console.warn("Yandex getPlayer(signed) failed, trying guest", signedError);
+    try {
+      return await sdk.getPlayer();
+    } catch (guestError) {
+      console.warn("Yandex getPlayer failed", guestError);
+      return null;
+    }
+  }
+}
+
+/**
  * @returns {Promise<YandexInitResult>}
  */
 export async function initYandexSdk() {
@@ -15,18 +33,48 @@ export async function initYandexSdk() {
 
   try {
     const sdk = await window.YaGames.init();
-    let player = null;
-    if (sdk && typeof sdk.getPlayer === "function") {
-      try {
-        player = await sdk.getPlayer();
-      } catch (playerError) {
-        console.warn("Yandex getPlayer failed", playerError);
-      }
-    }
+    const player = await loadPlayer(sdk);
     return { available: true, sdk, player };
   } catch (error) {
     console.warn("Yandex SDK init failed", error);
     return { available: false, sdk: null, player: null };
+  }
+}
+
+/**
+ * Сигнал Яндекс Играм: загрузка завершена, можно скрыть splash.
+ * @param {object | null | undefined} sdk
+ */
+export function signalYandexGameReady(sdk) {
+  try {
+    const api = sdk?.features?.LoadingAPI;
+    if (api && typeof api.ready === "function") api.ready();
+  } catch (e) {
+    console.warn("LoadingAPI.ready failed", e);
+  }
+}
+
+/**
+ * @param {object | null | undefined} sdk
+ */
+export function startYandexGameplay(sdk) {
+  try {
+    const api = sdk?.features?.GameplayAPI;
+    if (api && typeof api.start === "function") api.start();
+  } catch (e) {
+    console.warn("GameplayAPI.start failed", e);
+  }
+}
+
+/**
+ * @param {object | null | undefined} sdk
+ */
+export function stopYandexGameplay(sdk) {
+  try {
+    const api = sdk?.features?.GameplayAPI;
+    if (api && typeof api.stop === "function") api.stop();
+  } catch (e) {
+    console.warn("GameplayAPI.stop failed", e);
   }
 }
 
@@ -56,11 +104,5 @@ export function bindAccountSelectionHandlers(sdk, handlers = {}) {
  * @param {object | null | undefined} sdk
  */
 export async function refreshYandexPlayer(sdk) {
-  if (!sdk || typeof sdk.getPlayer !== "function") return null;
-  try {
-    return await sdk.getPlayer();
-  } catch (e) {
-    console.warn("refreshYandexPlayer failed", e);
-    return null;
-  }
+  return loadPlayer(sdk);
 }
