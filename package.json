@@ -1,11 +1,13 @@
 {
   "name": "marketplace-seller-simulator",
-  "version": "0.9.0-rc1",
+  "version": "1.0.0",
   "private": true,
   "description": "MSSIM — browser economic sim for Yandex Games",
   "scripts": {
     "dev": "npx serve .",
     "build": "node scripts/build-release.mjs",
-    "preview": "npx serve dist"
+    "preview": "npx serve dist",
+    "package": "node scripts/package-release.mjs",
+    "package:store": "node scripts/package-store-assets.mjs"
   }
 }

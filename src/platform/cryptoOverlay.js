@@ -5,6 +5,13 @@ import {
   cryptoPriceChangePct,
 } from "../core/cryptoExchangeModel.js";
 
+const ORDER_BOOK_TIP =
+  "Стакан — запас монет на бирже, который она готова продать. 100% — весь запас доступен; чем ниже %, тем меньше можно купить по текущей цене. Крупные сделки двигают котировку (проскальзывание).";
+
+function orderBookHelpHtml() {
+  return `<span class="kpi-help game-tip" data-tip="${ORDER_BOOK_TIP}" tabindex="0" aria-label="Что такое стакан">i</span>`;
+}
+
 let open = false;
 /** @type {(() => boolean) | null} */
 let canOpenCrypto = null;
@@ -82,7 +89,7 @@ export function renderCryptoOverlay(ctx) {
   meta.innerHTML = [
     `На счёте: <b>${money(state.cash)} ₽</b>`,
     `Портфель: <b>${money(summary.holdingsValue)} ₽</b>`,
-    `P&amp;L: <span style="color:${pnlColor}"><b>${summary.totalPnl >= 0 ? "+" : ""}${money(summary.totalPnl)} ₽</b></span>`,
+    `Результат: <span style="color:${pnlColor}"><b>${summary.totalPnl >= 0 ? "+" : ""}${money(summary.totalPnl)} ₽</b></span>`,
     `(реализ. ${money(summary.realizedPnl)} · открыт. ${money(summary.unrealizedPnl)})`,
     `· тик ${c.tick} · обновление через <b>${ticksLeft === c.ticksPerUpdate ? c.ticksPerUpdate : ticksLeft}</b> дн.`,
   ].join(" ");
@@ -113,7 +120,7 @@ export function renderCryptoOverlay(ctx) {
     .join("");
 
   panel.innerHTML = `<table class="stock crypto-table"><thead><tr>
-    <th>Монета</th><th>Цена</th><th>Δ</th><th>График</th><th>У вас</th><th>Стоимость</th><th>Стакан</th>
+    <th>Монета</th><th>Цена</th><th>Δ</th><th>График</th><th>У вас</th><th>Стоимость</th><th>Стакан ${orderBookHelpHtml()}</th>
   </tr></thead><tbody>${rows}</tbody></table>`;
 
   const sel = assets.find((a) => a.id === selectedId) || assets[0];
@@ -125,7 +132,7 @@ export function renderCryptoOverlay(ctx) {
   tradePanel.innerHTML = `
     <div class="crypto-trade-box">
       <div class="crypto-trade-title"><b>${sel.symbol}</b> · ${sel.name} · ${fmtPrice(spot)} ₽</div>
-      <p class="muted" style="margin:4px 0 10px;font-size:12px">В стакане ~${fmtQty(floatLeft)} ${sel.symbol} · ликвидность ${money(sel.dailyLiquidityRub)} ₽/день</p>
+      <p class="muted" style="margin:4px 0 10px;font-size:12px">В стакане ${orderBookHelpHtml()} ~${fmtQty(floatLeft)} ${sel.symbol} · ликвидность ${money(sel.dailyLiquidityRub)} ₽/день</p>
       <div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
         <label class="field" style="min-width:140px">Купить на, ₽
           <input id="cryptoBuyRubInput" type="number" min="100" step="100" value="${Math.min(10000, Math.max(100, maxBuyRub))}" style="width:100%"/>

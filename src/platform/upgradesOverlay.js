@@ -49,6 +49,14 @@ export function openUpgradesOverlay() {
       card.classList.remove("upgrade-card-pulse");
       void card.offsetWidth;
       card.classList.add("upgrade-card-pulse");
+      card.addEventListener(
+        "animationend",
+        () => {
+          card.classList.remove("upgrade-card-pulse");
+          card.style.transform = "";
+        },
+        { once: true }
+      );
     }
   });
 }

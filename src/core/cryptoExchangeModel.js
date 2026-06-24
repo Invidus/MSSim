@@ -321,3 +321,40 @@ export function cryptoPriceChangePct(history) {
   if (!prev) return 0;
   return ((cur - prev) / prev) * 100;
 }
+
+/**
+ * @param {object} state
+ * @param {{ id: string }} asset
+ */
+export function isExchangeStackEmpty(state, asset) {
+  const left = Number(state?.crypto?.exchangeFloat?.[asset.id]);
+  if (!Number.isFinite(left)) return false;
+  return left < 1e-9;
+}
+
+/**
+ * @param {object} state
+ * @param {{ id: string }} asset
+ */
+export function boughtFullExchangeStack(state, asset) {
+  if (!isExchangeStackEmpty(state, asset)) return false;
+  return (Number(state?.crypto?.holdings?.[asset.id]) || 0) > 0;
+}
+
+/**
+ * @param {object} state
+ * @param {import("./cryptoExchangeModel.js").CryptoAssetDef[]} assets
+ */
+export function boughtAnyFullExchangeStack(state, assets) {
+  if (!Array.isArray(assets) || !assets.length) return false;
+  return assets.some((a) => boughtFullExchangeStack(state, a));
+}
+
+/**
+ * @param {object} state
+ * @param {import("./cryptoExchangeModel.js").CryptoAssetDef[]} assets
+ */
+export function boughtAllExchangeStacks(state, assets) {
+  if (!Array.isArray(assets) || !assets.length) return false;
+  return assets.every((a) => boughtFullExchangeStack(state, a));
+}

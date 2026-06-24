@@ -1,6 +1,8 @@
-/** @typedef {{ id: string; name: string; type: string; durationDays: number; weight?: number; scope?: string; effect?: Record<string, unknown> }} EventDef */
+import { formatShopStory } from "./storeIdentityModel.js";
 
-export let EVENT_DAILY_CHANCE = 0.18;
+/** @typedef {{ id: string; name: string; type: string; durationDays: number; weight?: number; scope?: string; story?: boolean; storyTemplate?: string; minDay?: number; instantEffect?: Record<string, unknown>; effect?: Record<string, unknown> }} EventDef */
+
+export let EVENT_DAILY_CHANCE = 0.15;
 export let EVENT_PITY_DAYS = 6;
 
 let eventBalanceOpts = {
@@ -144,6 +146,10 @@ function applyEvent(state, def, rng) {
     delayIncomingShipments(state, inst.categoryId, Number(inst.effect.leadTimeExtraByCategory) || 0);
   }
 
+  if (def.instantEffect) {
+    applyInstantEventEffects(state, def.instantEffect, rng);
+  }
+
   state.activeEvents.push(inst);
   state.eventLog.push({
     day: state.day,
@@ -153,12 +159,15 @@ function applyEvent(state, def, rng) {
     categoryId: inst.categoryId,
     skuId: inst.skuId,
   });
+  const storyText = def.storyTemplate ? formatShopStory(def.storyTemplate, state) : null;
   state.lastDayEvent = {
     id: def.id,
     name: def.name,
     type: def.type,
     categoryId: inst.categoryId,
     skuId: inst.skuId,
+    isStory: def.story === true,
+    story: storyText,
   };
   state.daysSinceLastEvent = 0;
 
@@ -169,6 +178,57 @@ function applyEvent(state, def, rng) {
       state.lastEventCategoryId = inst.categoryId;
       state.consecutiveCategoryEvents = 1;
     }
+  }
+}
+
+/**
+ * @param {object} state
+ * @param {string} eventId
+ * @param {number} withinDays
+ */
+function recentStoryEvent(state, eventId, withinDays) {
+  const log = state?.eventLog || [];
+  for (let i = log.length - 1; i >= 0; i--) {
+    const row = log[i];
+    if (row.eventId !== eventId) continue;
+    const gap = (state.day || 1) - (row.day || 0);
+    return gap >= 0 && gap < withinDays;
+  }
+  return false;
+}
+
+/**
+ * @param {object} state
+ * @param {Record<string, unknown>} instant
+ * @param {() => number} rng
+ */
+function applyInstantEventEffects(state, instant, rng) {
+  if (instant.clearStockFraction != null) {
+    const frac = Math.max(0, Math.min(1, Number(instant.clearStockFraction) || 0));
+    for (const sku of state.skus || []) {
+      const id = sku.id;
+      const cur = Math.max(0, Number(state.inStock[id]) || 0);
+      state.inStock[id] = Math.round(cur * (1 - frac));
+    }
+  }
+  if (instant.clearAllStock) {
+    for (const sku of state.skus || []) {
+      state.inStock[sku.id] = 0;
+    }
+  }
+  if (instant.cashBonus) {
+    state.cash = (Number(state.cash) || 0) + Math.max(0, Number(instant.cashBonus) || 0);
+  }
+  if (instant.cashPenalty) {
+    state.cash = Math.max(0, (Number(state.cash) || 0) - Math.max(0, Number(instant.cashPenalty) || 0));
+  }
+  if (instant.grantStockUnits) {
+    const spec = instant.grantStockUnits;
+    const min = Number(spec.min) || 20;
+    const max = Number(spec.max) || min;
+    const units = min + Math.floor(rng() * (max - min + 1));
+    const skuId = pickRandomSku(state, rng);
+    if (skuId) state.inStock[skuId] = (Number(state.inStock[skuId]) || 0) + units;
   }
 }
 
@@ -199,7 +259,10 @@ function pickEventWeighted(pool, rng) {
  * @param {() => number} rng
  */
 function pickEvent(state, eventDefs, rng) {
+  const day = Math.max(1, Math.round(Number(state.day) || 1));
   let pool = eventDefs.filter((def) => {
+    if (def.minDay != null && day < Number(def.minDay)) return false;
+    if (def.story && recentStoryEvent(state, def.id, 12)) return false;
     if (def.scope === "category" && (state.consecutiveCategoryEvents || 0) >= 2) return false;
     return true;
   });

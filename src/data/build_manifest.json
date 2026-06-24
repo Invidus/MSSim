@@ -1,62 +1,90 @@
 {
-  "version": "0.9.0-rc1",
+  "version": "1.0.0",
   "phase": 5,
   "mode": "release",
-  "builtAt": "2026-06-18T21:29:35.936Z",
-  "totalBytes": 3650574,
-  "fileCount": 67,
+  "builtAt": "2026-06-24T20:40:33.626Z",
+  "totalBytes": 1340896,
+  "fileCount": 74,
   "files": [
-    {
-      "path": "dist/assets/store/cover-hero-1560x520.png",
-      "bytes": 1694352
-    },
-    {
-      "path": "dist/assets/store/cover-800x470.png",
-      "bytes": 812117
-    },
     {
       "path": "dist/assets/store/icon-512.png",
       "bytes": 605722
     },
     {
       "path": "dist/src/app.js",
-      "bytes": 229124
+      "bytes": 259078
     },
     {
       "path": "dist/index.html",
-      "bytes": 62064
+      "bytes": 118075
     },
     {
       "path": "dist/src/data/skus_v3.json",
       "bytes": 17996
     },
     {
+      "path": "dist/src/core/luxuryAssetsModel.js",
+      "bytes": 14080
+    },
+    {
+      "path": "dist/src/platform/luxuryOverlay.js",
+      "bytes": 14030
+    },
+    {
       "path": "dist/src/core/eventEngine.js",
-      "bytes": 10936
+      "bytes": 13226
+    },
+    {
+      "path": "dist/src/core/skuThumbModel.js",
+      "bytes": 12762
     },
     {
       "path": "dist/src/core/cryptoExchangeModel.js",
-      "bytes": 10854
-    },
-    {
-      "path": "dist/src/data/tutorial_steps.json",
-      "bytes": 10791
+      "bytes": 11938
     },
     {
       "path": "dist/src/platform/cryptoOverlay.js",
-      "bytes": 10702
+      "bytes": 11304
+    },
+    {
+      "path": "dist/src/data/achievements.json",
+      "bytes": 11096
+    },
+    {
+      "path": "dist/src/data/tutorial_steps.json",
+      "bytes": 10896
+    },
+    {
+      "path": "dist/src/platform/tutorialSpotlight.js",
+      "bytes": 9916
     },
     {
       "path": "dist/src/core/daySim.js",
-      "bytes": 8904
+      "bytes": 9834
+    },
+    {
+      "path": "dist/src/data/luxury_items.json",
+      "bytes": 9613
+    },
+    {
+      "path": "dist/src/platform/luxuryArt.js",
+      "bytes": 8425
     },
     {
       "path": "dist/src/data/progression_nodes.json",
       "bytes": 8190
     },
     {
-      "path": "dist/src/platform/tutorialSpotlight.js",
-      "bytes": 7638
+      "path": "dist/src/core/questModel.js",
+      "bytes": 8067
+    },
+    {
+      "path": "dist/src/core/achievementModel.js",
+      "bytes": 7773
+    },
+    {
+      "path": "dist/src/data/events_v3.json",
+      "bytes": 7476
     },
     {
       "path": "dist/src/data/skus_phase2.json",
@@ -83,6 +111,10 @@
       "bytes": 6798
     },
     {
+      "path": "dist/src/core/firstRunTutorial.js",
+      "bytes": 6731
+    },
+    {
       "path": "dist/src/core/balanceModel.js",
       "bytes": 6603
     },
@@ -91,16 +123,12 @@
       "bytes": 6457
     },
     {
-      "path": "dist/src/core/firstRunTutorial.js",
-      "bytes": 6113
+      "path": "dist/src/core/progressionModel.js",
+      "bytes": 6159
     },
     {
       "path": "dist/src/platform/playerUi.js",
-      "bytes": 5543
-    },
-    {
-      "path": "dist/src/core/progressionModel.js",
-      "bytes": 5496
+      "bytes": 5822
     },
     {
       "path": "dist/src/core/cardQualityModel.js",
@@ -111,10 +139,6 @@
       "bytes": 5118
     },
     {
-      "path": "dist/src/data/events_v3.json",
-      "bytes": 4937
-    },
-    {
       "path": "dist/src/core/storeListingModel.js",
       "bytes": 4766
     },
@@ -123,48 +147,24 @@
       "bytes": 4548
     },
     {
-      "path": "dist/src/data/sku_names_ru.json",
-      "bytes": 3600
+      "path": "dist/src/platform/achievementsOverlay.js",
+      "bytes": 3862
     },
     {
-      "path": "dist/src/data/store_listing.json",
-      "bytes": 3593
+      "path": "dist/src/platform/shopNameWelcome.js",
+      "bytes": 3705
     },
     {
       "path": "dist/src/platform/upgradesOverlay.js",
-      "bytes": 3487
+      "bytes": 3691
     },
     {
-      "path": "dist/src/data/build_manifest.json",
-      "bytes": 3460
+      "path": "dist/src/data/store_listing.json",
+      "bytes": 3627
     },
     {
-      "path": "dist/src/data/skus_beauty_m1.json",
-      "bytes": 3246
-    },
-    {
-      "path": "dist/src/core/beginnerUiModel.js",
-      "bytes": 3218
-    },
-    {
-      "path": "dist/src/platform/gameTooltip.js",
-      "bytes": 3195
-    },
-    {
-      "path": "dist/src/data/crypto_assets.json",
-      "bytes": 3113
-    },
-    {
-      "path": "dist/src/platform/dayTransition.js",
-      "bytes": 2845
-    },
-    {
-      "path": "dist/src/core/kpiAlertsModel.js",
-      "bytes": 2650
-    },
-    {
-      "path": "dist/src/platform/gameToast.js",
-      "bytes": 2530
+      "path": "dist/src/data/sku_names_ru.json",
+      "bytes": 3600
     }
   ]
 }

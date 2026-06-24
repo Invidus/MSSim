@@ -57,25 +57,29 @@ function ensureRoot() {
 }
 
 /**
- * @param {DOMRect} rect
+ * @param {DOMRect} holeRect
  * @param {HTMLElement} hole
  * @param {HTMLElement} popover
  * @param {string} placement
+ * @param {{ anchorRect?: DOMRect; maxWidth?: number }} [opts]
  */
-function positionSpotlight(rect, hole, popover, placement) {
+function positionSpotlight(holeRect, hole, popover, placement, opts = {}) {
+  const anchorRect = opts.anchorRect || holeRect;
   const pad = 8;
-  const holeTop = Math.max(8, rect.top - pad);
-  const holeLeft = Math.max(8, rect.left - pad);
-  const holeW = rect.width + pad * 2;
-  const holeH = rect.height + pad * 2;
+  const holeTop = Math.max(8, holeRect.top - pad);
+  const holeLeft = Math.max(8, holeRect.left - pad);
+  const holeW = holeRect.width + pad * 2;
+  const holeH = holeRect.height + pad * 2;
 
   hole.style.top = `${holeTop}px`;
   hole.style.left = `${holeLeft}px`;
   hole.style.width = `${holeW}px`;
   hole.style.height = `${holeH}px`;
 
-  const margin = 14;
-  popover.style.maxWidth = "min(380px, calc(100vw - 24px))";
+  const margin = placement === "bottom" ? 22 : 14;
+  const maxW = opts.maxWidth && opts.maxWidth > 0 ? opts.maxWidth : 380;
+  popover.style.maxWidth = `min(${maxW}px, calc(100vw - 24px))`;
+  popover.classList.toggle("tutorial-spotlight-popover--compact", maxW <= 300);
   popover.style.visibility = "hidden";
   popover.style.top = "0";
   popover.style.left = "0";
@@ -83,23 +87,61 @@ function positionSpotlight(rect, hole, popover, placement) {
   requestAnimationFrame(() => {
     const popH = popover.offsetHeight;
     const popW = popover.offsetWidth;
-    let top = holeTop + holeH + margin;
-    let left = holeLeft + holeW / 2 - popW / 2;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-    if (placement === "top" || top + popH > window.innerHeight - 12) {
-      top = Math.max(12, holeTop - popH - margin);
-    }
+    const aTop = anchorRect.top;
+    const aLeft = anchorRect.left;
+    const aW = anchorRect.width;
+    const aH = anchorRect.height;
+
+    const clamp = (top, left) => ({
+      top: Math.max(12, Math.min(top, vh - popH - 12)),
+      left: Math.max(12, Math.min(left, vw - popW - 12)),
+    });
+
+    const overlapsHole = (top, left) =>
+      left < holeLeft + holeW &&
+      left + popW > holeLeft &&
+      top < holeTop + holeH &&
+      top + popH > holeTop;
+
+    /** @type {{ id: string; top: number; left: number }[]} */
+    const candidates = [];
+
     if (placement === "center") {
-      top = Math.max(12, (window.innerHeight - popH) / 2);
-      left = Math.max(12, (window.innerWidth - popW) / 2);
+      const c = clamp((vh - popH) / 2, (vw - popW) / 2);
+      candidates.push({ id: "center", ...c });
     } else {
-      left = Math.max(12, Math.min(left, window.innerWidth - popW - 12));
+      const raw = [
+        { id: "left", top: aTop + aH / 2 - popH / 2, left: aLeft - popW - margin },
+        { id: "right", top: aTop + aH / 2 - popH / 2, left: aLeft + aW + margin },
+        { id: "bottom", top: aTop + aH + margin, left: aLeft + aW / 2 - popW / 2 },
+        { id: "top", top: aTop - popH - margin, left: aLeft + aW / 2 - popW / 2 },
+      ];
+      for (const row of raw) {
+        candidates.push({ id: row.id, ...clamp(row.top, row.left) });
+      }
     }
 
-    popover.style.top = `${top}px`;
-    popover.style.left = `${left}px`;
+    const preferred = candidates.find((c) => c.id === placement && !overlapsHole(c.top, c.left));
+    const fallback = candidates.find((c) => !overlapsHole(c.top, c.left));
+    const chosen = preferred || fallback || candidates.find((c) => c.id === placement) || candidates[0];
+
+    popover.style.top = `${chosen.top}px`;
+    popover.style.left = `${chosen.left}px`;
     popover.style.visibility = "visible";
   });
+}
+
+/**
+ * @param {HTMLElement|null} target
+ * @param {string} [placement]
+ */
+function resolveSpotlightPlacement(target, placement) {
+  const p = placement || "bottom";
+  if (target?.closest(".store-sidebar") && (p === "top" || p === "bottom")) return "left";
+  return p;
 }
 
 /**
@@ -178,7 +220,18 @@ export function renderTutorialSpotlight(content) {
       return;
     }
     const rect = target.getBoundingClientRect();
-    positionSpotlight(rect, hole, popover, content.placement || "bottom");
+    const useSidebarAnchor =
+      content.popoverAnchor && typeof window !== "undefined" && window.innerWidth >= 920;
+    const anchorEl = useSidebarAnchor ? resolveTarget(content.popoverAnchor) : target;
+    const anchorRect = anchorEl instanceof HTMLElement ? anchorEl.getBoundingClientRect() : rect;
+    let placement = resolveSpotlightPlacement(target, content.placement || "bottom");
+    if (useSidebarAnchor) placement = content.placement || "left";
+    else if (!useSidebarAnchor && content.popoverAnchor) placement = "bottom";
+
+    positionSpotlight(rect, hole, popover, placement, {
+      anchorRect,
+      maxWidth: content.popoverMaxWidth || 0,
+    });
     if (!target.closest(".next-day-fab")) {
       target.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }

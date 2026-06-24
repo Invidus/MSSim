@@ -1,6 +1,7 @@
 import { computeAdTrafficTotal, computeConversionRate } from "./demandModel.js";
 import { computeCappedOrders } from "./salesModel.js";
 import { computeQualityReturnFactor } from "./balanceModel.js";
+import { isSimpleQuestActive } from "./questModel.js";
 
 /**
  * @param {object} state
@@ -22,6 +23,11 @@ export function simulateSalesDay(state, cfg) {
   );
 
   const sumDemand = state.skus.reduce((acc, sku) => acc + sku.baseDemand, 0);
+  const questStockOnly = isSimpleQuestActive(state);
+  const stockedSkus = questStockOnly
+    ? state.skus.filter((sku) => (state.inStock[sku.id] ?? 0) > 0)
+    : state.skus;
+  const activeDemandSum = stockedSkus.reduce((acc, sku) => acc + sku.baseDemand, 0);
   const adBudget = Math.max(
     0,
     Number(state.adBudgetEffective != null ? state.adBudgetEffective : state.adBudget) || 0
@@ -72,6 +78,32 @@ export function simulateSalesDay(state, cfg) {
   for (const sku of state.skus) {
     const skuId = sku.id;
     const stockStart = state.inStock[skuId] ?? 0;
+
+    if (questStockOnly && stockStart <= 0) {
+      perSku.push({
+        skuId,
+        name: sku.name,
+        stockStart: 0,
+        price: state.skuPrices[skuId] ?? sku.recommendedPrice,
+        traffic: 0,
+        conversion: 0,
+        ordersRaw: 0,
+        ordersWanted: 0,
+        orders: 0,
+        unmetUnits: 0,
+        returned: 0,
+        grossRevenue: 0,
+        netSold: 0,
+        netRevenue: 0,
+        cogs: 0,
+        fee: 0,
+        payment: 0,
+        logistics: 0,
+        returnsCost: 0,
+      });
+      continue;
+    }
+
     const price = state.skuPrices[skuId] ?? sku.recommendedPrice;
     const catId = String(sku.categoryId || "beauty");
     const marketPriceMult =
@@ -86,7 +118,8 @@ export function simulateSalesDay(state, cfg) {
     const catEventOrganic = Number(eventMods.categoryOrganicMult?.[catId]) || 1;
     const skuEventOrganic = Number(eventMods.skuOrganicMult?.[skuId]) || 1;
     const organic = sku.baseDemand * catMod * demandDamp * organicGlobalMult * catEventOrganic * skuEventOrganic;
-    const weight = sumDemand > 0 ? sku.baseDemand / sumDemand : 0;
+    const demandPool = questStockOnly ? activeDemandSum : sumDemand;
+    const weight = demandPool > 0 ? sku.baseDemand / demandPool : 0;
     const adShare = adTotal * weight * demandDamp;
     const traffic = organic + adShare;
 
